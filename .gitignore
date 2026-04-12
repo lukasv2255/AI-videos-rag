@@ -1,6 +1,5 @@
 .env
 vectors.npy
-metadata.json
 ingest_done.json
 ingest.log
 transcripts/
