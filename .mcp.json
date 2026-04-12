@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "yt-rag": {
+      "command": "/bin/bash",
+      "args": ["/Users/lukas/claude-code/AI-videos-rag/run_mcp.sh"]
+    }
+  }
+}
