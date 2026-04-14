@@ -6,6 +6,8 @@ Dotazování přes MCP server přímo v Claude Code chatu.
 
 ## articles.md — klíčové pravidlo
 
+**Trigger:** Kdykoliv pošleš odkaz z `x.com` — automaticky bez ptaní proveď celé workflow níže.
+
 Když mi pošleš odkaz na článek, tweet nebo jakýkoliv obsah:
 1. **Přečti obsah** (přes Chrome MCP nebo WebFetch)
 2. **Extrahuj klíčové informace** — konkrétní fakta, ceny, use-casy, insights
