@@ -433,3 +433,61 @@ Firmy začínají používat AI, ale dělají to špatně — různé týmy, rů
 
 **Proč tyto příležitosti existují**
 AI jako infrastruktura uvnitř service businessu — nižší startup cost, rychlejší validace, vyšší marže, téměř nulová konkurence. Většina lidí staví produkt/app. Chytřejší je stavět service business poháněný AI.
+
+---
+
+## Claude Code Automatizace — 3-krokový systém
+
+*Zdroj: @noisyb0y1 na X, 13. 4. 2026*
+
+Google engineer s 11 lety zkušeností automatizoval 80% své práce pomocí Claude Code. Pracuje 2–3 hodiny denně místo 8. Tři kroky, 15–20 minut setup.
+
+**1. Karpathy CLAUDE.md (5 minut)**
+Andrej Karpathy zdokumentoval nejčastější chyby LLM při psaní kódu: over-engineering, ignorování existujících patterns, přidávání závislostí které nikdo nežádal. Jeden CLAUDE.md soubor s těmito 4 principy to řeší:
+
+- **Think Before Coding** — zastaví špatné předpoklady a přehlédnuté tradeoffs
+- **Simplicity First** — zastaví over-engineering a nafouklé abstrakce
+- **Surgical Changes** — zastaví úpravu kódu který nikdo nežádal
+- **Goal-Driven Execution** — nejdřív testy, ověřená kritéria úspěchu
+
+Výsledek: porušení konvencí klesá z ~40% na ~3%.
+
+Auto-generování pro jakýkoliv projekt:
+```
+claude -p "Read the entire project and create a CLAUDE.md based on: Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution. Adapt to the real architecture you see." --allowedTools Bash,Write,Read
+```
+
+**2. Everything Claude Code (10 minut)**
+`github.com/affaan-m/everything-claude-code` — 153 000+ hvězd
+
+Kompletní AI operating system pro vývoj produktů:
+- 30+ specializovaných agentů: `planner.md`, `architect.md`, `tdd-guide.md`, `code-reviewer.md`, `security-reviewer.md`, `loop-operator.md`
+- 180+ skills: TDD, security, research, content
+- AgentShield: 1 282 security testů přímo v konfiguraci
+- Funguje na Claude, Codex, Cursor, OpenCode, Gemini
+
+Instalace: `/plugin marketplace add affaan-m/everything-claude-code`
+
+⚠️ Nenačítej vše najednou — 27 agentů + 64 skills současně spálí token limity. Vezmi jen co potřebuješ.
+
+**3. Token fix — downgrade na v2.1.98 (30 sekund)**
+Claude Code v2.1.100 tichě krade tokeny:
+- v2.1.98: 169 514 bytes → 49 726 tokenů
+- v2.1.100: 168 536 bytes → 69 922 tokenů (méně bytes, ale +20 196 tokenů navíc)
+
+Inflace je server-side — nevidíš ji, nemůžeš ji ověřit přes `/context`. Důsledky: CLAUDE.md instrukce se ředí 20K tokeny skrytého obsahu, Claude Max limity hoří 40% rychleji.
+
+Fix: `npx claude-code@2.1.98`
+
+**Case study: jak vypadá plná automatizace**
+.NET app + GitLab API + Claude Code, cyklus každých 15 minut:
+1. Čte GitLab issues → Claude rozhodne jestli je issue ready pro vývoj
+2. Pokud ready → subagent začne pracovat → pushne branch → vytvoří PR
+3. PR workflow → kontroluje nové komentáře → implementuje je
+
+Výsledek: z 8h/den kódování na 2–3h review a testování. Kód stejné kvality — vše prochází review.
+
+**Checklist (15–20 minut celkem)**
+1. Karpathy CLAUDE.md: `claude -p "Create a CLAUDE.md based on Karpathy's principles for this project" --allowedTools Bash,Write,Read`
+2. Everything Claude Code: `/plugin marketplace add affaan-m/everything-claude-code`
+3. Token fix: `npx claude-code@2.1.98`
