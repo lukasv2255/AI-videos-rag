@@ -1,0 +1,44 @@
+# AI Videos RAG — projektové instrukce
+
+## Účel projektu
+RAG knowledge base z YouTube kanálu Nick Saraev + curated articles.
+Dotazování přes MCP server přímo v Claude Code chatu.
+
+## articles.md — klíčové pravidlo
+
+Když mi pošleš odkaz na článek, tweet nebo jakýkoliv obsah:
+1. **Přečti obsah** (přes Chrome MCP nebo WebFetch)
+2. **Extrahuj klíčové informace** — konkrétní fakta, ceny, use-casy, insights
+3. **Zkontroluj jestli téma už v articles.md existuje:**
+   - Pokud ano → **rozšiř existující sekci** o nové informace
+   - Pokud ne → **appenduj novou sekci** s nadpisem `## Název tématu`
+4. **Ulož a pushni** na GitHub
+
+### Formát nové sekce
+```markdown
+## Název tématu
+
+*Zdroj: autor/název, datum*
+
+Stručný úvod co téma řeší.
+
+**Klíčový bod 1**
+Detail...
+
+**Klíčový bod 2**
+Detail...
+```
+
+### Proč strukturovaně
+Nad articles.md se dotazuji přes MCP (`ask_nick_saraev` + articles citace).
+Dotazy mohou být konkrétní ("co je competitor intelligence") nebo obecné
+("ukaž perspektivní AI byznys modely") — sekce musí být dohledatelné podle tématu.
+
+## MCP server
+- Soubory: `mcp_server.py`, `run_mcp.sh`, `.mcp.json`
+- Vektory: `vectors.npy` (není v gitu), `metadata.json` (je v gitu)
+- Restart po změně `mcp_server.py`: zavři a otevři Claude Code
+
+## Důležité
+- `.env` nikdy do gitu
+- `vectors.npy` nikdy do gitu (40 MB, generuje se z `metadata.json`)
