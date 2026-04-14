@@ -404,3 +404,32 @@ Lidé co vydělávají skutečné peníze na Polymarketu nejsou ti s nejlepším
 
 *Historická analogie:*
 Zlatokopecká horečka: prodavači lopat zbohatli, ne horníci. Internetový boom: platební systémy a CDN překonaly většinu webů. Crypto: burzy a infrastrukturní protokoly vydělaly více než většina traderů. Prediction markets jsou další vlna.
+
+---
+
+## 6 AI Business Opportunities Nobody Is Building Yet (2027)
+
+*Zdroj: @zephyr_hg na X, 13. 4. 2026*
+
+Trh je zahlcený AI chatboty a content nástroji. Šest příležitostí, které jsou stále volné — každou lze validovat za víkend.
+
+**1. AI Compliance Monitoring pro malé firmy**
+Monitoring regulatorních změn (GDPR, HIPAA, SOC 2, daňové kódy) a automatické upozornění co firma musí udělat. Cena: $300–500/měsíc. Jedno zmeškané deadline = $10 000+ pokuta — ROI se prodá samo.
+
+**2. AI Proposal Writing pro service businesses**
+Freelanceři a agentury tráví 3–5 hodin na každém návrhu. Systém vezme brief z konverzace a vygeneruje branded proposal za minuty. Cena: $150–300/měsíc nebo $50 za proposal.
+
+**3. AI Quality Control pro e-commerce produktové listingy**
+Miliony e-shopů mají špatné popisy produktů — chybné specs, chybějící atributy, zastaralé SEO. Audit celého katalogu, přepsání a standardizace. Cena: $500–2000 za audit + monthly retainer.
+
+**4. Industry-Specific AI Training Packages**
+Generické AI nechápe obor. Právní firma potřebuje AI co mluví case law, nemovitosti zónové předpisy, medicína klinická terminologie. One-time setup $2 000–5 000 + monthly support $200–500. Specialista vydělá 3–5× víc než generalista.
+
+**5. AI Competitor Intelligence pro lokální firmy**
+Automatický monitoring konkurence — cenové změny, nové služby, review sentiment, nové kampagne. Weekly intelligence brief. Cena: $200–400/měsíc. Data jsou veřejná (weby, review sites, sociální sítě).
+
+**6. AI Workflow Auditing as a Service**
+Firmy začínají používat AI, ale dělají to špatně — různé týmy, různé nástroje, žádná konzistence. Audit všech AI workflow, zpráva co funguje/co je rozbité/co chybí. Cena: $1 500–3 000 za audit. Před 12 měsíci tato služba neexistovala.
+
+**Proč tyto příležitosti existují**
+AI jako infrastruktura uvnitř service businessu — nižší startup cost, rychlejší validace, vyšší marže, téměř nulová konkurence. Většina lidí staví produkt/app. Chytřejší je stavět service business poháněný AI.
