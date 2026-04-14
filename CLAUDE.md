@@ -14,7 +14,12 @@ Když mi pošleš odkaz na článek, tweet nebo jakýkoliv obsah:
 3. **Zkontroluj jestli téma už v articles.md existuje:**
    - Pokud ano → **rozšiř existující sekci** o nové informace
    - Pokud ne → **appenduj novou sekci** s nadpisem `## Název tématu`
-4. **Ulož a pushni** na GitHub
+4. **Pošli podrobné shrnutí do chatu** — co bylo přidáno/rozšířeno v articles.md.
+   Formát shrnutí v chatu:
+   - Název sekce a zda jde o novou sekci nebo rozšíření existující
+   - Všechny klíčové body které byly přidány (kompletní, ne zkrácené)
+   - Co z obsahu bylo vynecháno a proč (reklamy, opakování, irelevantní části)
+5. **Ulož a pushni** na GitHub
 
 ### Formát nové sekce
 ```markdown
