@@ -228,29 +228,37 @@ Advisor typicky generuje jen 400–700 tokenů (krátký plán). Celkové nákla
 
 ## 6. Claude Code — klávesové zkratky a workflow
 
+*Zdroj rozšíření: @hanakoxbt na X, 9. 4. 2026 — https://x.com/hanakoxbt/status/2042242394557464896*
+
 **V prohlížeči (claude.ai):**
 
-| Zkratka | Funkce |
-|---|---|
-| `Cmd/Ctrl+K` | Nový chat okamžitě |
-| `↑` (šipka nahoru) | Upravit poslední zprávu místo follow-up (21× úspora tokenů) |
-| `Cmd/Ctrl+.` | Zastavit generování okamžitě |
-| `Cmd/Ctrl+/` | Přepnout/skrýt sidebar (+24% pracovního prostoru) |
-| `Cmd/Ctrl+Shift+L` | Přepnout dark/light mode |
-| `Shift+Enter` | Nový řádek bez odeslání |
+| Zkratka | Funkce | Proč to záleží |
+|---|---|---|
+| `Cmd/Ctrl+K` | Nový chat okamžitě | 4s → 0.3s, 15-20× denně |
+| `↑` (šipka nahoru) | Upravit poslední zprávu místo follow-up | **21× méně tokenů** — follow-up: ~10 500 tokenů, edit: ~500 tokenů |
+| `Cmd/Ctrl+.` | Zastavit generování okamžitě | Ušetří 500–1 000 tokenů za špatnou odpověď |
+| `Cmd/Ctrl+/` | Přepnout/skrýt sidebar | +24% pracovního prostoru (280px zpět) |
+| `Cmd/Ctrl+Shift+L` | Přepnout dark/light mode | 6s → 0.2s |
+| `Shift+Enter` | Nový řádek bez odeslání | Zabrání náhodným odesláním (4–5× denně) |
 
 **V Claude Code (terminál):**
 
-| Zkratka | Funkce |
-|---|---|
-| `Esc Esc` (dvojité) | Rewind na libovolný checkpoint |
-| `Ctrl+R` | Zpětné vyhledávání v historii promptů |
-| `Alt/Option+T` | Přepnout extended thinking per zpráva |
-| `Ctrl+G` | Otevřít prompt v externím editoru |
-| `Shift+Tab` | Cyklovat: normal → auto-accept → plan |
-| `/btw` | Boční otázka bez přerušení úkolu |
+| Zkratka | Funkce | Proč to záleží |
+|---|---|---|
+| `Esc Esc` (dvojité) | Rewind na libovolný checkpoint | 4 možnosti: kód+konverzace, jen konverzace, jen kód, shrnutí od checkpointu. Zero-risk experimenty. |
+| `Ctrl+R` | Fuzzy search přes celou historii promptů | Hledáš prompt z minulého týdne? 2 klíčová slova → hned |
+| `Alt/Option+T` | Přepnout extended thinking per zpráva | Jednoduché dotazy: off. Komplexní architektura: on. Ušetří 3 000+ tokenů na triviálních dotazech. |
+| `Ctrl+G` | Otevřít prompt v externím editoru (VS Code, vim…) | Psaní víceřádkového promptu v terminálu: 2 min boje s kurzorem → 30s v editoru |
+| `Shift+Tab` | Cyklovat: normal → auto-accept → plan | normal = ptá se na vše, auto-accept = rovnou dělá, plan = ukáže plán bez spuštění |
+| `/btw` | Boční otázka bez přerušení úkolu | Ptáš se bez zrušení kontextu — vytvořil Erik Schluntz z Claude Code týmu |
 
-**Naměřená úspora:** 51 min/den → 22 min/den = 29 minut denně, ~120 hodin ročně.
+**Celkové čísla (naměřeno týden před/po):**
+- Před: 51 min/den na klikání, navigaci, čekání, přeposílání
+- Po: 22 min/den
+- Úspora: **29 minut denně = ~120 hodin ročně** (3 celé pracovní týdny)
+- Token úspora z editace, stopování a thinking toggle: ~35%
+
+Všechny zkratky ověříš sám přes `Cmd+?` (Mac) nebo `Ctrl+?` (Windows) v libovolném chatu.
 
 ---
 
