@@ -1,7 +1,9 @@
-# AI Videos RAG — Nick Saraev
+# AI Videos RAG
 
-Knowledge base z YouTube kanálu Nick Saraev. Umožňuje ptát se na obsah videí
-přímo v Claude Code chatu přes MCP server.
+Dvě knowledge bases dotazovatelné přímo v Claude Code chatu přes MCP server:
+
+- **YouTube transkripty** (RAG) — sémantické vyhledávání přes embeddingy (aktuálně Nick Saraev, 282 videí)
+- **articles.md** — kurátorované články z X.com, keyword search podle sekcí
 
 ---
 
@@ -61,14 +63,21 @@ Potvrď načtení MCP serveru `yt-rag` — server se spustí automaticky.
 
 ## Jak se ptát
 
+**articles.md** (default — rychlé, žádné API volání):
 | Co chceš | Jak se zeptat |
 |---|---|
-| Otázka o tématu | *"Co říká Nick o cold emailech?"* |
-| Shrnutí konkrétního videa | *"Shrň video CLAUDE SKILLS FULL COURSE"* |
+| Téma z článků | *"Co jsou Claude Code Routines?"* |
+| Byznys příležitosti | *"Ukaž perspektivní AI byznysy"* |
+| Konkrétní info | *"Co je competitor intelligence?"* |
+
+**YouTube transkripty** (pouze když explicitně zmíníš Nicka):
+| Co chceš | Jak se zeptat |
+|---|---|
+| Otázka z videí | *"Co říká Nick o cold emailech?"* |
+| Shrnutí videa | *"Shrň video CLAUDE SKILLS FULL COURSE"* |
 | Výpis videí | *"Vypiš videa o n8n"* |
 
-**Poznámka:** Pokud MCP říká "video chybí" — neverit. Použij `list_videos`
-nebo `summarize_video` s částí názvu.
+**Poznámka:** Pokud MCP říká "video chybí" — nevěřit. Použij `list_videos` nebo `summarize_video` s částí názvu.
 
 ---
 
@@ -87,7 +96,8 @@ nebo `summarize_video` s částí názvu.
 AI-videos-rag/
 ├── .env                  # API klíče (není v gitu)
 ├── .mcp.json             # konfigurace MCP serveru
-├── metadata.json         # texty a metadata všech chunků
+├── articles.md           # kurátorované články (keyword search)
+├── metadata.json         # texty a metadata chunků z transkriptů
 ├── vectors.npy           # embeddingy (není v gitu, generuje ingest.py)
 ├── build_rag_docs.py     # převod transkriptů → .md soubory
 ├── ingest.py             # embedování a ukládání vektorů
