@@ -84,6 +84,34 @@ description: Helps with projects.
 - Velký tým: interní plugin marketplace (GitHub sandbox → PR do marketplace po získání trakce)
 - Skilly mohou záviset na jiných skilly — odkazuj je jménem, model je zavolá pokud jsou nainstalované
 
+**Skill Graphs — sítě propojených skillů** (@arscontexta, 18. 2. 2026 — https://x.com/arscontexta/status/2023957499183829467):
+
+Jeden SKILL.md nestačí pro komplexní domény. Skill graph = síť skill souborů propojených wikilinky. Každý soubor je jedna kompletní myšlenka, technika nebo skill.
+
+Jak funguje:
+- Každý node má YAML description → agent skenuje bez čtení celého souboru
+- Wikilinky jsou vetkaná do prózy (nesou kontext, ne jen referenci)
+- MOCs (Maps of Content) organizují sub-témata pro navigaci
+- Progressive disclosure: index → descriptions → links → sekce → plný obsah
+
+Příklady skill grafů: trading (risk management, market psychology, position sizing...), legal (contract patterns, compliance, jurisdiction...), company onboarding (org struktura, procesy, kultura, competitive landscape).
+
+Plugin `arscontexta` (249 souborů) je skill graph pro budování knowledge bases — nainstaluj, spusť `/learn` a `/reduce`.
+
+**Skills — failure modes a testování** (@hooeem, 11. 3. 2026 — https://x.com/hooeem/status/2031755971265974632):
+
+5 failure modes:
+1. **Silent Skill** (nikdy se nespustí) — YAML description příliš slabá. Fix: přidej trigger phrases, buď explicitní.
+2. **Hijacker** (spustí se na špatné requesty) — description příliš broad nebo chybí negative boundaries. Fix: přidej "Do NOT use for [jiné tasky]".
+3. **Drifter** (spustí se správně, špatný output) — ambiguózní instrukce. Fix: nahraď vágní jazyk konkrétním ("Format nicely" → "Use H2 headings, bold first sentence, max 3 lines/paragraph").
+4. **Fragile Skill** (funguje na clean input, padá na edge cases) — chybí edge case instrukce. Fix: "If [condition], then [specific action]."
+5. **Overachiever** (přidává co nikdo nechce) — chybí scope constraints. Fix: "Output ONLY [specified format] and nothing else."
+
+State management přes session:
+Přidej do SKILL.md: *"At the start of every session, read context-log.md. At the end, write summary of what finished and what's pending."* → Claude čte vlastní poznámky z předchozí session.
+
+Skills 2.0 testování: Evals (Pass/Fail pro konkrétní test prompts), Benchmarks (pass rate, token cost, speed), A/B Comparator (slepý test dvou verzí instrukcí), Description Optimiser.
+
 ---
 
 ## 2. LLM Knowledge Base — Karpathyho metoda
@@ -577,6 +605,16 @@ Lidé co vydělávají skutečné peníze na Polymarketu nejsou ti s nejlepším
 
 *Historická analogie:*
 Zlatokopecká horečka: prodavači lopat zbohatli, ne horníci. Internetový boom: platební systémy a CDN překonaly většinu webů. Crypto: burzy a infrastrukturní protokoly vydělaly více než většina traderů. Prediction markets jsou další vlna.
+
+**7 AI dovedností co vydělávají peníze v 2026** (@aiedge_, 11. 3. 2026 — https://x.com/aiedge_/status/2031735799994265818):
+
+1. **Tool Stacking & Selection** — znát které AI nástroje použít na jaký task a jak je řetězit (output jednoho → input druhého). Příklad: YouTube transcript → NotebookLM → Claude Skill → Canva. Firmy platí za systémový design, ne za znalost jednoho nástroje.
+2. **AI-Powered Research Systems** — autonomní scraping, syntéza a surfování insights. Cíl: raw data → actionable recommendation. X scraper na outlier viral topics → pitch pro content firmy.
+3. **AI Media Generation** — faceless content, AI voiceover/avatar/reklamy. Productized workflow: niche + monthly retainer pro content agentury, personal brands, e-commerce.
+4. **Coding (vibe coding pro SMB)** — small/medium firmy potřebují custom interní nástroje (dashboardy, client portály, workflow automations). Nemohou si dovolit vývojáře za $10K+, ale zaplatí $1 500–3 000 za funkční nástroj za týden.
+5. **Agentic Workflow Design** — multi-step AI agenti (Zapier/MCP/n8n, lead gen agenti, customer service). OpenClaw expert: $2 000–6 000 za setup pro lokální firmy.
+6. **Prompt Engineering** — balíček: audit jak tým promptuje + půldenní workshop = okamžitě lepší výstupy. Scalable: kurz, coaching, corporate training.
+7. **AI Consulting (meta-skill)** — diagnóza kde AI vytvoří leverage + implementace. $5 000 audit → $10 000–20 000 implementace → $2 000–5 000/měs retainer. Jeden klient = šestimístný byznys.
 
 ---
 
