@@ -5,6 +5,7 @@ Používá numpy pro vektorové vyhledávání (bez ChromaDB).
 
 import json
 import os
+import re
 from pathlib import Path
 
 import anthropic
@@ -38,18 +39,24 @@ if ARTICLES_FILE.exists():
     for line in ARTICLES_FILE.read_text(encoding="utf-8").splitlines():
         if line.startswith("## ") or line.startswith("### "):
             if current_title and current_body:
+                body_text = "\n".join(current_body).strip()
+                url_match = re.search(r'https?://\S+', body_text)
                 _articles_sections.append({
-                    "title": current_title,
-                    "text":  "\n".join(current_body).strip(),
+                    "title":      current_title,
+                    "text":       body_text,
+                    "source_url": re.sub(r'[)*.,:\s]+$', '', url_match.group(0)) if url_match else "",
                 })
             current_title = line.lstrip("#").strip()
             current_body  = []
         else:
             current_body.append(line)
     if current_title and current_body:
+        body_text = "\n".join(current_body).strip()
+        url_match = re.search(r'https?://\S+', body_text)
         _articles_sections.append({
-            "title": current_title,
-            "text":  "\n".join(current_body).strip(),
+            "title":      current_title,
+            "text":       body_text,
+            "source_url": re.sub(r'[)*.,:\s]+$', '', url_match.group(0)) if url_match else "",
         })
 
 
@@ -66,6 +73,18 @@ def _search_articles(query: str, k: int = 3) -> list:
             scored.append((score, sec))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [s for _, s in scored[:k]]
+
+
+def _format_article_hits(hits: list) -> str:
+    """Formátuje výsledky z articles.md do čitelného bloku."""
+    parts = []
+    for sec in hits:
+        preview = sec["text"][:600].strip()
+        if len(sec["text"]) > 600:
+            preview += "..."
+        url_line = f"\n🔗 {sec['source_url']}" if sec.get("source_url") else ""
+        parts.append(f"**{sec['title']}**\n{preview}{url_line}")
+    return "\n\n".join(parts)
 
 
 def _search(query: str, k: int = TOP_K) -> list:
@@ -149,24 +168,38 @@ def ask_nick_saraev(question: str) -> str:
 
     answer = response.content[0].text
 
-    # Přidej citace z articles.md
     article_hits = _search_articles(question)
+
+    video_block = (
+        f"## 📹 Videa — Nick Saraev\n\n"
+        f"{answer}\n\n"
+        f"**Zdroje ({len(seen_titles)} videí):**\n{sources}"
+    )
+
     if article_hits:
-        article_parts = []
-        for sec in article_hits:
-            # Zobraz max 600 znaků ze sekce
-            preview = sec["text"][:600].strip()
-            if len(sec["text"]) > 600:
-                preview += "..."
-            article_parts.append(f"**{sec['title']}**\n{preview}")
-        articles_block = "\n\n".join(article_parts)
+        articles_block = _format_article_hits(article_hits)
         return (
-            f"{answer}\n\n"
-            f"---\n**Zdroje ({len(seen_titles)} videí):**\n{sources}\n\n"
-            f"---\n**📄 Citace z articles.md:**\n\n{articles_block}"
+            f"{video_block}\n\n"
+            f"---\n\n"
+            f"## 📄 Články\n\n"
+            f"{articles_block}"
         )
 
-    return f"{answer}\n\n---\n**Zdroje ({len(seen_titles)} videí):**\n{sources}"
+    return video_block
+
+
+@mcp.tool()
+def search_articles(query: str, k: int = 5) -> str:
+    """
+    Prohledá kurátorované články v articles.md a vrátí nejrelevantnější sekce.
+    Použij pro otázky o Claude ekosystému, skills, MCP, agentech, byznys příležitostech
+    a dalších tématech z articles.md — bez volání embeddings API.
+    Vrátí sekce s názvem, obsahem a odkazem na zdroj.
+    """
+    hits = _search_articles(query, k=k)
+    if not hits:
+        return "Žádné relevantní sekce nenalezeny."
+    return f"## 📄 Články — {len(hits)} výsledků\n\n{_format_article_hits(hits)}"
 
 
 @mcp.tool()

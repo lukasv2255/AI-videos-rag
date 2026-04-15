@@ -557,6 +557,16 @@ docs/project_notes/
 **Compound effect:**
 - 1. bug: 1 hodina → 2. výskyt: 10 minut → 3. výskyt: 2 minuty → 4. výskyt: Claude mu předejde
 
+**Konkrétní příklady co memory řeší** (@Suryanshti777, 28. 3. 2026 — https://x.com/Suryanshti777/status/2037921273062506764):
+
+- **Bez decisions.md:** tým používá Tailwind, CSS modules i Chakra UI najednou → chaos. S decisions.md: `ADR-006: Use Tailwind, avoid Chakra/CSS modules` → Claude vynucuje konzistenci automaticky.
+- **Bez key_facts.md:** Claude hádá porty, endpointy, env setup → špatné konfigurace. S key_facts.md: `Staging API: api.staging.app.com:8443, DB: PostgreSQL, Auth: Clerk` → Claude přestane hádat.
+- **Bez bugs.md:** stejný bug `Connection refused on DB` (root cause: staging port 5433) se řeší znovu. S bugs.md: 45 minut → 2 minuty.
+
+Klíčový princip: bez paměti Claude navrhuje nové knihovny, conflicting patterns, duplicitní závislosti — ne proto že je špatný, ale proto že nemá kontext. Memory mění Claude z chatbota na *learning AI engineer*.
+
+Implementace: čisté markdown soubory, žádný RAG, žádný vector DB, žádné embeddingy. Pod 300 řádků. Obrovský dopad.
+
 ---
 
 ## 10. Byznys příležitosti — Prediction Markets a AI freelancing
