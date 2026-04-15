@@ -45,7 +45,7 @@ Dotazy mohou být konkrétní ("co je competitor intelligence") nebo obecné
 
 ## Dotazování — trigger a pravidla
 
-**Trigger:** Zpráva ve formátu `ask, mcp [dotaz]` → zavolej MCP nástroje:
+**Trigger:** Zpráva začínající `ask [dotaz]` → zavolej MCP nástroje:
 - `search_articles` pro dotazy o obsahu articles.md
 - `ask_nick_saraev` pouze když je v dotazu explicitně Nick ("co říká Nick", "podle Nicka", "z videí")
 - Jinak defaultně: čti přímo `articles.md` bez MCP volání

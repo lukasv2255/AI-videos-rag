@@ -171,7 +171,7 @@ def ask_nick_saraev(question: str) -> str:
     article_hits = _search_articles(question)
 
     video_block = (
-        f"## 📹 Videa — Nick Saraev\n\n"
+        f"**📹 Videa — Nick Saraev**\n\n"
         f"{answer}\n\n"
         f"**Zdroje ({len(seen_titles)} videí):**\n{sources}"
     )
@@ -181,7 +181,7 @@ def ask_nick_saraev(question: str) -> str:
         return (
             f"{video_block}\n\n"
             f"---\n\n"
-            f"## 📄 Články\n\n"
+            f"**📄 Články**\n\n"
             f"{articles_block}"
         )
 
@@ -199,7 +199,7 @@ def search_articles(query: str, k: int = 5) -> str:
     hits = _search_articles(query, k=k)
     if not hits:
         return "Žádné relevantní sekce nenalezeny."
-    return f"## 📄 Články — {len(hits)} výsledků\n\n{_format_article_hits(hits)}"
+    return f"**📄 Články** — {len(hits)} výsledků\n\n{_format_article_hits(hits)}"
 
 
 @mcp.tool()
