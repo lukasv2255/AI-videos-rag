@@ -8,3 +8,6 @@ chroma_db/
 __pycache__/
 *.pyc
 nohup.out
+mcp_server.py
+.mcp.json
+run_mcp.sh
