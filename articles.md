@@ -55,6 +55,35 @@ description: Helps with projects.
 4. **Context-aware tool selection** — stejný výsledek, různé nástroje podle kontextu
 5. **Domain-specific intelligence** — specializovaná znalost zabudovaná do logiky (např. finanční compliance)
 
+**9 typů skillů podle Anthropic (Thariq, Anthropic, 17. 3. 2026 — https://x.com/trq212/status/2033949937936085378):**
+
+| Typ | Co řeší | Příklady |
+|---|---|---|
+| **Library & API Reference** | Správné použití interních nebo problematických knihoven, edge cases, gotchas | `billing-lib`, `internal-platform-cli`, `frontend-design` |
+| **Product Verification** | Testování a ověřování kódu, ideálně s Playwright/tmux | `signup-flow-driver`, `checkout-verifier`, `tmux-cli-driver` |
+| **Data Fetching & Analysis** | Napojení na datové a monitoring stacky, credentials, dashboard IDs | `funnel-query`, `cohort-compare`, `grafana` |
+| **Business Process & Team Automation** | Opakující se workflow jako jeden příkaz, ukládání výsledků do logů | `standup-post`, `create-ticket`, `weekly-recap` |
+| **Code Scaffolding & Templates** | Generování boilerplate s natural language požadavky | `new-workflow`, `new-migration`, `create-app` |
+| **Code Quality & Review** | Vynucování code style, adversarial review, testing practices | `adversarial-review`, `code-style`, `testing-practices` |
+| **CI/CD & Deployment** | Fetch, push, deploy s daty z jiných skillů | `babysit-pr`, `deploy-service`, `cherry-pick-prod` |
+| **Runbooks** | Symptom → multi-tool investigation → structured report | `service-debugging`, `oncall-runner`, `log-correlator` |
+| **Infrastructure Operations** | Routine maintenance s guardrails pro destruktivní akce | `resource-orphans`, `dependency-management`, `cost-investigation` |
+
+**Nejdůležitější tipy pro psaní skillů (od Anthropic):**
+- **Gotchas sekce** — nejvyšší-signal obsah v jakémkoliv skillu. Buduj ji průběžně z reálných failure points.
+- **Skill je složka, ne soubor** — využij filesystem jako progressive disclosure: `references/api.md`, `assets/template.md`, `scripts/helper.py`
+- **Description je pro model** — Claude scanuje descriptions aby rozhodl "je tu skill pro tento request?". Piš trigger podmínky, ne shrnutí.
+- **Nerailroad Clauda** — dej mu info, ale flexibilitu adaptovat se. Příliš specifické instrukce v reusable skillu = problém.
+- **Setup config** — pro skilly vyžadující konfiguraci (Slack kanál, složka...) ukládej do `config.json` ve složce skillu. Pokud chybí, Claude se zeptá.
+- **Paměť** — skilly mohou ukládat data do `${CLAUDE_PLUGIN_DATA}` (stabilní složka přes upgrady). Např. `standups.log` pro kontext minulých standupů.
+- **On-demand hooks** — skilly mohou registrovat hooks platné jen pro danou session. Příklady: `/careful` (blokuje rm -rf, DROP TABLE, force-push), `/freeze` (blokuje edity mimo konkrétní složku).
+- **Měření** — PreToolUse hook pro logování skill usage = víš které skilly jsou populární nebo undertriggerují.
+
+**Distribuce v týmu:**
+- Malý tým: `./.claude/skills/` v repozitáři
+- Velký tým: interní plugin marketplace (GitHub sandbox → PR do marketplace po získání trakce)
+- Skilly mohou záviset na jiných skilly — odkazuj je jménem, model je zavolá pokud jsou nainstalované
+
 ---
 
 ## 2. LLM Knowledge Base — Karpathyho metoda
@@ -466,6 +495,15 @@ Každý Claude agent: vlastní git worktree + vlastní úkol + vlastní testy + 
 - `/simplify` — paralelní code reviewery (duplicitní logika, nested conditionals, špatné queries)
 - `/batch` — interaktivní plánování → desítky agentů → paralelní PRs
 
+**Installable skill (všech 42 tipů):**
+```bash
+mkdir -p ~/.claude/skills/boris
+curl -L -o ~/.claude/skills/boris/SKILL.md https://howborisusesclaudecode.com/api/install
+```
+Pak `/skills boris` — Claude načte celý workflow.
+
+*Zdroj rozšíření: @NainsiDwiv50980 na X, 27. 3. 2026 — https://x.com/NainsiDwiv50980/status/2037558089386430578*
+
 ---
 
 ## 9. Project Memory System pro Claude Code
@@ -788,3 +826,56 @@ Stín: nepoužívat box-shadow, místo toho border 1px solid #e5e0d8
 
 **Co AI design stále neumí:**
 AI zvládne ~70 % designové práce za zlomek času. Zbylých 30 % — brand identita, emoční rezonance, kontextové UX rozhodování — vyžaduje lidský úsudek. Víc paralelních agentů nenahrazuje kvalitu vizuálního rozhodování.
+
+---
+
+## Claude Cowork — nastavení pro maximální produktivitu
+
+*Zdroj: @NickSpisak_ na X, 27. 3. 2026 — https://x.com/NickSpisak_/status/2037535318614610191*
+*Zdroj: @coreyganim na X, 27. 3. 2026 — https://x.com/coreyganim/status/2037549431151526241*
+
+Claude Cowork = funkce v Claude Desktop app která dělá skutečnou práci: čte email, kontroluje kalendář, píše dokumenty, napojuje se na Slack, Gmail, Google Calendar, Notion, 30+ dalších nástrojů.
+
+**Proč většina lidí Cowork nepoužívá správně:** přeskočí prvních 30 minut konfigurace. Claude bez nastavení nezná tvé jméno, byznys, styl komunikace ani workflow.
+
+**5-krokový setup (30 minut, nebo 10 minut s pluginem):**
+
+**Krok 1 — Napoj nástroje PRVNÍ (5 minut)**
+Před psaním instrukcí připoj nástroje — Claude pak může tahat kontext z existujících dokumentů při setupu.
+Priorita: Google Workspace (Drive, Gmail, Calendar) → Slack → Notion → project management (Asana, Linear)
+
+**Krok 2 — Vytvoř context soubory (10 minut)**
+Tři soubory v dedikované složce (např. `ClaudeContext/`):
+- `about-me.md` — co děláš, jaké projekty, background, koho sloužíš, jaké nástroje používáš
+- `brand-voice.md` — jak komunikuješ (přímý/vřelý/akademický?), co nesnášíš (buzzwords, pasivní hlas), příklady tvých nejlepších textů
+- `working-style.md` — má se nejdřív ptát nebo rovnou pracovat? Formát výstupů? Hard rules ("nikdy em dashes")?
+
+Trick: nepiš to sám — řekni Claudovi "Create these three files. Interview me so you can fill them out."
+
+**Krok 3 — Global Instructions (5 minut)**
+Claude Desktop → Settings → Cowork → Edit Global Instructions. Zkondenzuj context soubory do ~800 slov:
+```
+Who I am (2-3 věty)
+How I work (přístup, komunikace)  
+Output defaults (formát podle typu tasku)
+Voice/tone
+Key business context
+Rules (always do / never do)
+```
+Přidej vždy: **"Always show a plan. Wait for my approval. Then execute."** — tohle zabrání Claude přepisovat soubory které neměl.
+
+**Krok 4 — Nainstaluj skills (5 minut)**
+Customize → Browse Plugins. Začni s 3-5:
+- Productivity plugin (od Anthropic) — task management, plánování dne
+- Jeden specifický pro tvůj workflow (newsletter, projekty, výzkum...)
+- Vlastní skill: "I want to create a plugin for [recurring task]. Interview me about the workflow, then turn it into a plugin."
+
+**Krok 5 — Scheduled tasks (5 minut)**
+Automatické tasky bez promptování. Příklad daily briefing (každý den 8:00):
+*"Check Slack for high-priority messages. Check email for anything needing response. Check calendar and prep for today's meetings. Give me a prioritized briefing."*
+→ Otevřeš laptop, briefing už čeká.
+
+**Další tips:**
+- **Transfer z ChatGPT** — Settings → Capabilities → "Start import from other AI providers". Vygeneruje prompt, vlož do ChatGPT, dostaneš export všech memories → vlož do Claude.
+- **successful-examples/** složka — dej tam své nejlepší emaily, posty, návrhy. Claude reverse-engineeruje tvůj styl z reálných výsledků, ne z popisu.
+- **Plan mode je safety net** — bez něj Claude může přepsat soubory které neměl. S ním: uvidíš plán → schválíš → teprve pak spustí.
