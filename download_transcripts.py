@@ -22,6 +22,8 @@ from pathlib import Path
 # ── Konfigurace kanálů ─────────────────────────────────────────────────────
 CHANNELS = [
     {"name": "Nick Saraev", "url": "https://www.youtube.com/@nicksaraev", "slug": "nicksaraev"},
+    {"name": "Cole Medin", "url": "https://www.youtube.com/@ColeMedin", "slug": "colemedin"},
+    {"name": "Greg Isenberg", "url": "https://www.youtube.com/@GregIsenberg", "slug": "gregisenberg"},
 ]
 
 # ── Cesty ──────────────────────────────────────────────────────────────────
