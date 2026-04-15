@@ -43,6 +43,11 @@ Nad articles.md se dotazuji přes MCP (`ask_nick_saraev` + articles citace).
 Dotazy mohou být konkrétní ("co je competitor intelligence") nebo obecné
 ("ukaž perspektivní AI byznys modely") — sekce musí být dohledatelné podle tématu.
 
+## Dotazování — kdy použít co
+
+- **Defaultně:** čti přímo `articles.md` — rychlejší, žádné API volání
+- **`ask_nick_saraev`:** pouze když uživatel explicitně zmíní Nicka ("co říká Nick", "podle Nicka", "z videí" apod.)
+
 ## MCP server
 - Soubory: `mcp_server.py`, `run_mcp.sh`, `.mcp.json`
 - Vektory: `vectors.npy` (není v gitu), `metadata.json` (je v gitu)
