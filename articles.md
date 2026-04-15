@@ -120,6 +120,32 @@ Příklady promptů:
 - *"Take my last meeting note and create summary.md I can send by email"*
 - *"Add this idea to my research note under the #Ideas heading"*
 
+**Nepotřebuješ Obsidian** (@coreyganim, 6. 4. 2026 — https://x.com/coreyganim/status/2041144598446092411):
+Složka .md souborů + dobrý schema soubor překoná fancy tool stack v 90 % případů. Základní setup:
+- `raw/` — sem padá vše, neorganizuj
+- `wiki/` — LLM to vlastní celé
+- `outputs/` — odpovědi a reporty
+
+CLAUDE.md template (schema soubor):
+```markdown
+# Knowledge Base Schema
+## What This Is
+A personal knowledge base about [YOUR TOPIC].
+## How It's Organized
+- raw/ contains unprocessed source material. Never modify these files.
+- wiki/ contains the organized wiki. AI maintains this entirely.
+- outputs/ contains generated reports and answers.
+## Wiki Rules
+- Every topic gets its own .md file in wiki/
+- Every wiki file starts with a one-paragraph summary
+- Link related topics using [[topic-name]] format
+- Maintain an INDEX.md that lists every topic
+## My Interests
+[List 3-5 things you want this KB to focus on]
+```
+
+Compounding loop: jednou za měsíc řekni: *"Review the entire wiki/. Flag contradictions, find topics mentioned but never explained, suggest 3 new articles."*
+
 ---
 
 ## 3. MCP (Model Context Protocol) — co to je a jak funguje
@@ -205,6 +231,39 @@ claude mcp list
 ```
 
 *Zdroj: @zodchiii na X, 8. 4. 2026 — https://x.com/zodchiii/status/2041804097628582294*
+
+**Jak postavit vlastní MCP server (TypeScript):**
+
+*Zdroj: @techwith_ram na X, 24. 3. 2026 — https://x.com/techwith_ram/status/2036401174715207817*
+
+Tři primitiva:
+- **Tools** — akce s vedlejšími efekty (send email, run query). Mají `name`, `description` (AI čte), JSON schema vstupů.
+- **Resources** — read-only data identifikovaná URI (`file:///path`, `db://customers/42`). Statické nebo live.
+- **Prompts** — znovupoužitelné prompt šablony s dynamickými argumenty.
+
+Dvě transportní vrstvy:
+- **stdio** — lokální vývoj, child process (nejjednodušší, bez portů/auth)
+- **HTTP + SSE** — remote servery, multi-user, cloud deployment
+
+Napojení na Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "node",
+      "args": ["/absolute/path/to/build/index.js"]
+    }
+  }
+}
+```
+
+**Časté chyby při vývoji MCP serveru:**
+- `"Server not found"` — cesta v configu musí být absolutní
+- `"Tool returned an error"` — přidej try/catch a vrať chybu jako text, ne throw
+- stdout pollution — při stdio transportu **nikdy** nepoužívej `console.log` (corrupts stream), používej `console.error`
+- Schema mismatch — buď konkrétní v popisu vstupů, AI jinak hádá typy
+
+Debug nástroj: `npx @modelcontextprotocol/inspector` — testuj tool calls bez Claude.
 
 ---
 
@@ -688,3 +747,44 @@ Sandbox (Unikraft micro-VM v produkci, Docker lokálně) dostane pouze 3 env pro
 **Klíčový závěr:** *"Your agent should have nothing worth stealing and nothing worth preserving."*
 
 Kompromisy: extra network hop na každé operaci, 3 services místo 1. V praxi latence je zanedbatelná vedle LLM response times.
+
+---
+
+## AI Design — proč AI generuje stále stejný design a jak to změnit
+
+*Zdroj: vibecoding.cz, 30. 3. 2026 — https://www.vibecoding.cz/articles/ostatni/proc-ai-generuje-stale-stejny-design-a-jak-to-ve-vasem-projektu-zmenit/*
+
+AI modely konvergují k průměru trénovacích dat — Inter font, modrofialový gradient, card grid, abstraktní hero sekce. Termín pro to: **"AI slop design"**.
+
+**Proč se to děje:**
+Komponentové knihovny (Tailwind UI, shadcn/ui, Material Design) dominují trénovacím datům. Model reprodukuje průměr milionu webů = SaaS landing page šablona.
+
+**Nejrychlejší opravy v promptech:**
+
+- **Negativní instrukce fungují lépe než pozitivní** — "žádný card grid", "nepoužívej Inter ani Roboto", "žádný fialovo-modrý gradient" → model respektuje konkrétní zákazy, ignoruje vágní "udělej to originální"
+- **Typografie je nejrychlejší páka** — jedna řádka CSS změní charakter celé stránky. Příklady: `Space Grotesk` + `Source Serif Pro`, nebo `DM Serif Display` + `Outfit`
+- **Barvy s kontextem** — "tmavě zelená a krémová, skandinávský minimalismus" generuje něco rozpoznatelného; "moderní SaaS paleta" generuje modrofialovou
+- **Reálný obsah místo lorem ipsum** — model přizpůsobí layout délce textu
+- **Referenční screenshoty jako vstup** — přiložit 2–3 screenshoty webů které se ti líbí + "inspiruj se vizuálním stylem, ale nepoužívej stejné barvy ani layout"
+- **Animace s účelem** — max. 3 typy: jedna vstupní sekvence, jeden scroll efekt, jeden hover přechod. Doporučení: Framer Motion
+
+**Design tokeny v CLAUDE.md (trvalé řešení):**
+Místo opakování v každém promptu — ulož vizuální identitu do CLAUDE.md jednou:
+```markdown
+## Design systém
+Fonty: DM Serif Display (nadpisy), Outfit (tělo textu)
+Barvy: primární #1a4d2e, sekundární #f5f0e8, akcent #d4a574
+Border-radius: 0px karty, 4px tlačítka, 8px inputy
+Spacing základ: 8px grid
+Stín: nepoužívat box-shadow, místo toho border 1px solid #e5e0d8
+```
+
+**Nástroje:**
+
+- **Google Stitch** — AI-nativní plátno pro prototypování. "Vibe Design" mód: popíšeš záměr a pocit, ne komponenty. Exportuje `design.md` (design systém jako markdown) + export do Figmy. MCP server pro napojení na Claude Code. Free: 350 generací/měsíc.
+- **Pencil.dev** — vizuální plátno přímo v IDE (Cursor, VS Code). Soubory `.pen` = JSON v repozitáři vedle kódu. Agent má plný vizuální kontext přes MCP. Vytvořil Tomáš Krcha (spoluautor Adobe XD). Free.
+- **Paper.design** — HTML/CSS canvas (design je rovnou kód). GPU shadery (halftone, liquid metal). MCP server s 24 nástroji. Seed investice $4.2M od Accel.
+- **Impeccable** (`npx skills add pbakaus/impeccable`) — skill od autora jQuery UI a Chrome DevTools. Příkazy: `/audit`, `/critique`, `/polish`, `/bolder`, `/quieter`, `/teach-impeccable` (onboarding projektu).
+
+**Co AI design stále neumí:**
+AI zvládne ~70 % designové práce za zlomek času. Zbylých 30 % — brand identita, emoční rezonance, kontextové UX rozhodování — vyžaduje lidský úsudek. Víc paralelních agentů nenahrazuje kvalitu vizuálního rozhodování.
