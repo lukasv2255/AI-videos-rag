@@ -59,30 +59,66 @@ description: Helps with projects.
 
 ## 2. LLM Knowledge Base — Karpathyho metoda
 
+*Zdroj rozšíření: @polydao na X, 9. 4. 2026 — https://x.com/polydao/status/2042203352054771748*
+
 **Základní myšlenka (Andrej Karpathy, ex-OpenAI/Tesla):**
 Většina AI nástrojů funguje jako RAG: nahraješ soubory, LLM při každém dotazu od nuly hledá relevantní části. Karpathyho přístup je jiný — LLM postupně buduje a udržuje persistentní wiki z markdown souborů, která sedí mezi tebou a surovými zdroji. Znalost se kompiluje jednou a průběžně aktualizuje, ne znovu odvozuje při každém dotazu.
+
+Mentální posun: **LLM jako kompilátor a knihovník — ne chatbot.**
 
 **Tři vrstvy systému:**
 - **Raw sources** (`raw/`) — tvoje kurátorované zdrojové dokumenty. Neměnné, LLM z nich pouze čte.
 - **Wiki** (`wiki/`) — LLM-generované markdown soubory. Souhrny, entity stránky, koncepty, porovnání. LLM tuto vrstvu vlastní celou.
-- **Schema** (`CLAUDE.md` nebo `AGENTS.md`) — říká LLM jak je wiki strukturována, jaké jsou konvence a jaké workflow následovat.
+- **Reports** (`reports/`) — výstupy: odpovědi na dotazy, eseje, slide decky. Každý dotaz se ukládá jako permanentní asset.
 
-**Tři operace:**
-- **Ingest:** Přidáš nový zdroj do `raw/`, LLM ho zpracuje — jeden zdroj může ovlivnit 10–15 wiki stránek.
-- **Query:** Kladeš otázky proti wiki, odpovědi se ukládají zpět jako nové wiki stránky.
-- **Lint:** Periodická kontrola — kontradikce, zastaralé tvrzení, orphan stránky, chybějící cross-reference.
+**6-krokový workflow**
+
+1. **Capture** — Obsidian Web Clipper ukládá libovolnou webovou stránku do `raw/` jako .md s URL, titulkem a datem. Neorganizuj, jen ukládej.
+2. **Compile** — LLM skenuje `raw/` a vytváří/aktualizuje stránky v `wiki/`. Každý koncept = vlastní .md soubor s definicí, zdroji a backlinky.
+3. **Navigate** — Obsidian graph view ukazuje clustery znalostí a izolované uzly (= mezery které ještě nemáš).
+4. **Query** — místo "Explain X" v stateless chatu: *"Using only my wiki, explain X based on everything I've researched."* LLM čte wiki a zapíše odpověď do `reports/`.
+5. **Answer in files, not chat** — klíčový návyk: každá odpověď jde do souboru, ne do chatu. Výstupy: Markdown report, Marp slide deck (.md → prezentace), PNG diagramy.
+6. **Health check** — LLM periodicky skenuje wiki na: kontradikce, entities bez vlastní stránky, duplikáty, nesourcované claims, nové kandidáty na články.
+
+**Tři operace (zkráceno):**
+- **Ingest** → jeden zdroj může ovlivnit 10–15 wiki stránek
+- **Query** → odpovědi se ukládají zpět jako nové wiki stránky
+- **Lint** → weekly health check příkazem
+
+**Obsidian — proč právě on:**
+- Backlinks — všude kde je koncept zmíněn
+- Graph view — vizuální mapa znalostí, vidíš mezery
+- Dataview plugin — dotazování poznámek jako databáze
+- Marp plugin — .md soubor přímo jako prezentace
 
 **Praktické nastavení (víkendový MVP):**
-- **Den 1:** Obsidian + vault se složkami `raw/`, `wiki/`, `reports/` + Obsidian Web Clipper + 20–30 naklipen článků na jedno téma
-- **Den 2:** Skill `/kb-compile` → Claude vytvoří wiki stránky → Obsidian graph view → Skill `/kb-report` → první dotaz
+- **Den 1:** Obsidian + vault (`raw/`, `wiki/`, `reports/`) + Web Clipper + 20–30 naklipen článků na jedno téma
+- **Den 2:** Skill `/kb-compile` → wiki stránky → graph view → Skill `/kb-report` → první dotaz
 
 **Proč lepší než stateless "New Chat":**
 - Dnešní odpověď se stává zítřejším kontextem
 - Tvá terminologie a frameworky se stávají kanonickými wiki stránkami
-- 6 měsíců práce = privátní korpus, který model dokáže ingested v jednom context window
+- 6 měsíců práce = privátní korpus, který model dokáže číst v jednom context window
+
+**Privátní/offline varianta:** Obsidian + Ollama (lokální LLM) — nic neopouští tvůj počítač. Claude Code se přidá jen pro konkrétní tasky kde cloud model dává smysl.
+
+**Advanced — finetuning z wiki:**
+Až wiki dosáhne dostatečné velikosti, lze ji použít jako finetuning korpus — znalost se "zapeče" přímo do vah modelu. Pro tým: interní docs, API historie, design decisions → finetuned org assistant.
 
 **Obsidian MCP integrace:**
-Claude čte a zapisuje přímo do vaultu v reálném čase. Setup: Community Plugins → Local REST API → API key → `claude_desktop_config.json`. Prompty jako: *"Find all notes mentioning Polymarket and give me a short summary of each"* fungují bez copy-paste.
+MCP server pro Obsidian (3 300+ hvězd na GitHubu) — Claude čte a zapisuje přímo do vaultu v reálném čase.
+
+Dostupné nástroje: `list_files_in_vault`, `get_file_contents`, `search`, `patch_content` (vloží pod konkrétní heading), `append_content`, `delete_file`.
+
+Setup (3 kroky):
+1. Obsidian → Community Plugins → "Local REST API" → install → zkopíruj API key
+2. Otevři `~/Library/Application Support/Claude/claude_desktop_config.json`
+3. Přidej MCP blok s hostem `127.0.0.1:27124` a API key → restart Claude
+
+Příklady promptů:
+- *"Find all notes mentioning Polymarket and give me a short summary of each"*
+- *"Take my last meeting note and create summary.md I can send by email"*
+- *"Add this idea to my research note under the #Ideas heading"*
 
 ---
 
@@ -153,47 +189,79 @@ Klíčový mentální model: AI model → MCP klient → server → databáze. N
 
 **Praktické pravidlo:** 3–5 serverů je sweet spot — každý přidaný server spotřebovává tokeny na popis nástrojů.
 
+**Jak nainstalovat libovolný MCP server (Claude Code):**
+```bash
+# Základní instalace
+claude mcp add server-name -- npx -y @package/server
+
+# S API klíčem
+claude mcp add server-name -e API_KEY=your-key -- npx -y @package/server
+
+# Globálně (všechny projekty)
+claude mcp add --scope user server-name -- npx -y @package/server
+
+# Přehled nainstalovaných
+claude mcp list
+```
+
+*Zdroj: @zodchiii na X, 8. 4. 2026 — https://x.com/zodchiii/status/2041804097628582294*
+
 ---
 
 ## 4. Claude Managed Agents — infrastruktura v cloudu
+
+*Zdroj rozšíření: @NickSpisak_ na X, 8. 4. 2026 — https://x.com/NickSpisak_/status/2041949191887262164*
 
 **Co to je:**
 Dosud: stavíš celou infrastrukturu sám (sandboxing, state management, error recovery, credential handling) — měsíce engineeringu. Managed Agents = Anthropic říká: *"My to zvládneme. Ty jen řekni co má agent dělat."*
 
 **4 stavební bloky:**
-1. **Agent** — konfigurace: model, system prompt, nástroje. Vytvoříš jednou, znovu použiješ.
-2. **Environment** — izolovaný kontejner s předinstalovaným Python, Node.js, Go.
-3. **Session** — běžící instance agenta, pamatuje si stav, může běžet hodiny.
-4. **Events** — zprávy tam a zpět, agent streamuje výsledky.
+1. **Agent** — konfigurace: model, system prompt, nástroje + MCP servery. Vytvoříš jednou, znovu použiješ.
+2. **Environment** — izolovaný kontejner. Předinstaluj Python, Node.js, Go, libovolné balíčky přes `"packages": {"pip": ["pandas", "numpy"]}`.
+3. **Session** — běžící instance agenta, pamatuje si stav, soubory přetrvávají, může běžet hodiny.
+4. **Events** — server-sent events: zprávy tam a zpět, agent streamuje responses, tool calls, status updates.
 
-**Jak nasadit prvního agenta:**
+**Deployment za 10 minut (3 API volání):**
+
 ```bash
+# 1. Instalace CLI
+brew install anthropic-cli
+
+# 2. Vytvoř agenta
 curl https://api.anthropic.com/v1/agents \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "anthropic-beta: managed-agents-2026-04-01" \
   -d '{"name": "My Agent", "model": "claude-sonnet-4-6",
        "tools": [{"type": "agent_toolset_20260401"}]}'
+
+# 3. Vytvoř environment
+curl https://api.anthropic.com/v1/environments \
+  -d '{"name": "dev-env", "config": {"type": "cloud", "networking": {"type": "unrestricted"}}}'
 ```
 `agent_toolset_20260401` aktivuje vše: bash, file read/write, web search, web fetch, grep, glob.
 
 **Systém oprávnění:**
 - `always_allow` — automatické spouštění (interní agenti)
 - `always_ask` — čeká na schválení každého tool callu (zákaznicky orientované)
-- Lze kombinovat: agent automaticky čte soubory, ale čeká na souhlas před odesláním emailu
+- Lze kombinovat: agent automaticky čte soubory, ale čeká na souhlas před bash příkazy
+- MCP nástroje defaultně `always_ask` — nový third-party nástroj se nespustí automaticky
+- **Výhoda oproti LangGraph/CrewAI/AutoGen:** ty nemají per-tool permission scoping out of the box, zde je to config flag
 
 **Cena:**
 - Standardní Claude API token sazby + $0.08/session-hour
-- Web search: $10/1000 hledání
 - Typická 10minutová session = pár centů
 
 **Příklady co se buduje:**
 - Sentry/Seer: klonuje repo → čte kód → píše opravu → otevírá PR
 - Rakuten: specialistické agenty pro každé oddělení, nasazení za méně než týden
 - Asana AI Teammates: agent pracuje v Asaně vedle lidí
+- Data analysis: agent dostane CSV → napíše Python skript → spustí → vrátí insights
 
-**Rychlý start:**
+**Rychlý start (bez API):**
 ```
 start onboarding for managed agents in Claude API
 ```
+Nebo: `platform.claude.com` → vizuální agent builder → testuj inline → zkopíruj agent ID do kódu.
 
 ---
 
