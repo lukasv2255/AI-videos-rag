@@ -25,7 +25,7 @@ Když mi pošleš odkaz na článek, tweet nebo jakýkoliv obsah:
 ```markdown
 ## Název tématu
 
-*Zdroj: autor/název, datum*
+*Zdroj: autor/název, datum — https://x.com/...*
 
 Stručný úvod co téma řeší.
 
@@ -35,6 +35,8 @@ Detail...
 **Klíčový bod 2**
 Detail...
 ```
+
+**Pravidlo:** Řádek `*Zdroj:*` musí vždy obsahovat plný URL odkaz na originální článek/tweet.
 
 ### Proč strukturovaně
 Nad articles.md se dotazuji přes MCP (`ask_nick_saraev` + articles citace).

@@ -409,7 +409,7 @@ Zlatokopecká horečka: prodavači lopat zbohatli, ne horníci. Internetový boo
 
 ## 6 AI Business Opportunities Nobody Is Building Yet (2027)
 
-*Zdroj: @zephyr_hg na X, 13. 4. 2026*
+*Zdroj: @zephyr_hg na X, 13. 4. 2026 — https://x.com/zephyr_hg/status/2043735668396872188*
 
 Trh je zahlcený AI chatboty a content nástroji. Šest příležitostí, které jsou stále volné — každou lze validovat za víkend.
 
@@ -438,7 +438,7 @@ AI jako infrastruktura uvnitř service businessu — nižší startup cost, rych
 
 ## Claude Code Automatizace — 3-krokový systém
 
-*Zdroj: @noisyb0y1 na X, 13. 4. 2026*
+*Zdroj: @noisyb0y1 na X, 13. 4. 2026 — https://x.com/noisyb0y1/status/2043609541477044439*
 
 Google engineer s 11 lety zkušeností automatizoval 80% své práce pomocí Claude Code. Pracuje 2–3 hodiny denně místo 8. Tři kroky, 15–20 minut setup.
 
@@ -496,7 +496,7 @@ Výsledek: z 8h/den kódování na 2–3h review a testování. Kód stejné kva
 
 ## Claude Code Routines — proč poráží n8n a Zapier
 
-*Zdroj: @coreyganim na X, 14. 4. 2026*
+*Zdroj: @coreyganim na X, 14. 4. 2026 — https://x.com/coreyganim/status/2044137332920492467*
 
 Claude Code Routines nejsou další automation tool. Je to jiná kategorie: Claude běží na Anthropic cloud infrastruktuře s přístupem k repozitářům, GitHub events a externím nástrojům. Místo předem definované sekvence — přemýšlí a adaptuje se.
 
@@ -536,7 +536,7 @@ Be thorough but constructive. Focus on issues, not style preferences.
 
 ## Claude Power User za 30 dní — framework a byznys
 
-*Zdroj: @cyrilXBT na X, 15. 4. 2026*
+*Zdroj: @cyrilXBT na X, 15. 4. 2026 — https://x.com/cyrilxbt/status/2044240739635179615*
 
 Autor šel za 30 dní od průměrného uživatele Claude k trénování firemních týmů za $1 500–$2 000 za workshop. 14 firem na waitlistu. Žádný technický background.
 
@@ -569,7 +569,7 @@ Autor šel za 30 dní od průměrného uživatele Claude k trénování firemní
 
 ## Secure Agent Sandbox Infrastructure — Browser Use architektura
 
-*Zdroj: @larsencc (Larsen Cundric, Browser Use) na X, 27. 2. 2026*
+*Zdroj: @larsencc (Larsen Cundric, Browser Use) na X, 27. 2. 2026 — https://x.com/larsencc/status/2027225210412470668*
 
 Browser Use provozuje miliony web agentů. Článek popisuje jak vyřešili bezpečnostní izolaci agentů co mohou spouštět libovolný kód.
 
