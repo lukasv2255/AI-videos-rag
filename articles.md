@@ -491,3 +491,124 @@ Výsledek: z 8h/den kódování na 2–3h review a testování. Kód stejné kva
 1. Karpathy CLAUDE.md: `claude -p "Create a CLAUDE.md based on Karpathy's principles for this project" --allowedTools Bash,Write,Read`
 2. Everything Claude Code: `/plugin marketplace add affaan-m/everything-claude-code`
 3. Token fix: `npx claude-code@2.1.98`
+
+---
+
+## Claude Code Routines — proč poráží n8n a Zapier
+
+*Zdroj: @coreyganim na X, 14. 4. 2026*
+
+Claude Code Routines nejsou další automation tool. Je to jiná kategorie: Claude běží na Anthropic cloud infrastruktuře s přístupem k repozitářům, GitHub events a externím nástrojům. Místo předem definované sekvence — přemýšlí a adaptuje se.
+
+**5 věcí co Routines umí a n8n neumí**
+
+- **Reasoning o problému** — PR review routine nečte jen jestli prošly testy. Čte codebase, chápe architekturní patterns, aplikuje reálné review standardy týmu. Drag-and-drop to neumí.
+- **Generování a opravy kódu** — když app spadne, routine nealertuje. Klonuje repo, čte error logy, diagnostikuje root cause, napíše fix, otestuje, otevře PR. Ty jen schválíš.
+- **Context awareness přes systémy** — Slack zpráva + Linear issue + GitHub changes = Claude čte vše jako kontext, ne jako oddělené kroky.
+- **Konfigurace přirozeným jazykem** — neprogramuješ klikáním. Popíšeš úkol v angličtině. "Review every PR for security issues, leave comments, post summary to Slack." Hotovo.
+- **Continuous improvement** — když routine nefunguje dobře, řekneš Claudovi co zlepšit. Prompt se adaptuje na dalším runu.
+
+**Kde n8n ještě vyhrává:** jednoduché integrace, 300+ hotových konektorů, vizuální učení.
+**Kde Routines vyhrává:** komplexní automatizace, reasoning, edge case handling, generování kódu, vlastní integrace.
+
+**Jak postavit první routine (10–15 minut)**
+
+1. Jdi na `claude.ai/code/routines` → New routine
+2. Napiš prompt v angličtině — co má routine dělat (ne kroky, ale výsledek)
+3. Přidej GitHub repo a konektory (Slack, atd.)
+4. Zvol trigger: schedule / GitHub event / API webhook
+5. Klikni Create — sleduj logy, uprav prompt podle výsledku
+
+**Příklad — PR review routine:**
+```
+You are a code reviewer. When a PR is submitted:
+- Read the code changes
+- Check for security vulnerabilities and performance issues
+- Check alignment with coding standards
+- Leave inline comments on specific lines
+- Post a summary to Slack
+Be thorough but constructive. Focus on issues, not style preferences.
+```
+
+**Předpoklady:** Claude Pro nebo vyšší (Routines vyžadují Claude Code on the web).
+
+---
+
+## Claude Power User za 30 dní — framework a byznys
+
+*Zdroj: @cyrilXBT na X, 15. 4. 2026*
+
+Autor šel za 30 dní od průměrného uživatele Claude k trénování firemních týmů za $1 500–$2 000 za workshop. 14 firem na waitlistu. Žádný technický background.
+
+**Klíčový insight:** Claude je reasoning engine, ne vyhledávač. Výkon je přímo úměrný kvalitě briefu. Naučit se dávat dobrý brief = naučit se nástroj.
+
+**10 dovedností co oddělují power usery**
+
+1. **Role Assignment** — před každým taskem dej Claudovi roli. Samo o sobě zlepší výstup o ~40%.
+2. **Constraint Setting** — řekni co nemá dělat stejně jasně jako co má dělat.
+3. **Iteration Loops** — nikdy nepřijímej první draft. Jedno konkrétní připomínkové kolo = dramatická změna. Tři kola = výstup co bys sám nenapsal.
+4. **Context Preservation** — jeden dlouhý conversation per projekt, ne nový chat pokaždé. Kontext se kumuluje.
+5. **Persona Training** — vlož své nejlepší texty, řekni "piš v tomto stylu". Claude zpětně inženýruje tvůj hlas lépe než jakýkoliv brief.
+6. **Output Formatting** — vždy specifikuj formát (tabulka, odrážky, odstavce, čísla). Bez toho = nekonzistentní výsledky.
+7. **Chain of Thought** — u komplexních tasků řekni "think step by step before answering". Dramaticky snižuje chyby.
+8. **Projects and Memory** — Claude Projects = persistentní paměť přes všechny konverzace. Přidej brand voice, audience, klíčové info.
+9. **Skill Files** — `skill.md` soubory pro opakující se workflow. Načítají se jen když jsou potřeba → lean context window.
+10. **Failure Analysis** — když výstup selže, zeptej se Clauda proč. Řekne ti přesně co šlo špatně. Oprav → updatuj prompt.
+
+**30denní cesta (začínáš od nuly)**
+
+- Dny 1–3: pouze Role Assignment — každý prompt začíná rolí, nic jiného
+- Dny 4–7: naučit se iterovat — jeden output, tři kola zpětné vazby
+- Dny 8–14: první systém — jeden opakující se task → prompt template
+- Dny 15–21: Claude Projects — brand voice, audience, klíčová data
+- Dny 22–30: druhý a třetí systém → power user threshold
+
+**Byznys model:** firmy platí za konzistenci, ne za znalost Clauda. Casual uzeři mají náhodné výsledky protože nemají systém. Workshop za půl dne = $1 500, celý den = $2 000.
+
+---
+
+## Secure Agent Sandbox Infrastructure — Browser Use architektura
+
+*Zdroj: @larsencc (Larsen Cundric, Browser Use) na X, 27. 2. 2026*
+
+Browser Use provozuje miliony web agentů. Článek popisuje jak vyřešili bezpečnostní izolaci agentů co mohou spouštět libovolný kód.
+
+**Problém:** agent co může spouštět kód má přístup ke všemu na stroji — env vars, API klíče, DB credentials, interní služby.
+
+**Dva přístupy k izolaci**
+
+| Pattern | Co se izoluje | Jak funguje |
+|---|---|---|
+| **Pattern 1 — Isolate the tool** | Nebezpečné operace (code execution) v sandboxu | Agent běží na tvé infrastruktuře, sandbox volá přes HTTP |
+| **Pattern 2 — Isolate the agent** | Celý agent v sandboxu | Agent nemá žádná credentials, komunikuje přes control plane |
+
+Browser Use začal s Pattern 1, přešel na Pattern 2.
+
+**Pattern 2 — Implementace**
+
+Sandbox (Unikraft micro-VM v produkci, Docker lokálně) dostane pouze 3 env proměnné:
+- `SESSION_TOKEN`
+- `CONTROL_PLANE_URL`
+- `SESSION_ID`
+
+Žádné AWS klíče, žádné DB credentials, žádné API tokeny.
+
+**Control Plane** je proxy pro vše:
+- LLM volání: sandbox pošle nové zprávy → control plane přidá celou historii → pošle do providera
+- Soubory: sandbox požádá o presigned S3 URL → nahraje přímo na S3 bez AWS credentials
+- Billing a cost caps: control plane vynucuje, sandbox neví
+
+**Bezpečnostní hardening sandboxu:**
+1. **Bytecode-only** — Python .py soubory smazány při build, jen .pyc bytecode
+2. **Privilege drop** — start jako root (čtení bytecode) → okamžitý drop na `sandbox` user
+3. **Env stripping** — SESSION_TOKEN přečten do Python proměnné → smazán z `os.environ`
+
+**Unikraft micro-VM:**
+- Boot pod 1 sekundu
+- Scale-to-zero: idle VM se suspend, při requestu resume
+- Distribuováno přes více metros (AWS)
+- Lokálně/evaly: stejný Docker image, stejný entrypoint → "same image everywhere"
+
+**Klíčový závěr:** *"Your agent should have nothing worth stealing and nothing worth preserving."*
+
+Kompromisy: extra network hop na každé operaci, 3 services místo 1. V praxi latence je zanedbatelná vedle LLM response times.
