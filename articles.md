@@ -927,3 +927,502 @@ Automatické tasky bez promptování. Příklad daily briefing (každý den 8:00
 - **Transfer z ChatGPT** — Settings → Capabilities → "Start import from other AI providers". Vygeneruje prompt, vlož do ChatGPT, dostaneš export všech memories → vlož do Claude.
 - **successful-examples/** složka — dej tam své nejlepší emaily, posty, návrhy. Claude reverse-engineeruje tvůj styl z reálných výsledků, ne z popisu.
 - **Plan mode je safety net** — bez něj Claude může přepsat soubory které neměl. S ním: uvidíš plán → schválíš → teprve pak spustí.
+
+---
+
+## Claude Managed Agents — hluboký dív: bezpečnost, architektura, enterprise
+
+*Zdroj rozšíření: @hooeem na X, 14. 4. 2026 — https://x.com/hooeem/status/2044068404659646923*
+
+### Stale Harness Trap — proč workaroundy zabíjejí výkon
+
+Typická past: postavíš harness kolem dnešního modelu, hardcoduješ workaroundy pro jeho quirky, odešleš do produkce. Funguje. Pak vyjde nový model a tvoje workaroundy se stávají dead code.
+
+Příklad z Anthropic: Claude 3.5 Sonnet měl "context anxiety" — model předčasně ukončoval tasky jak se plnil kontext window. Engineeři zabudovali automatické context resety do harnessu. Po vydání Claude 4.5 Opus toto omezení zmizelo. Hardcoded resety se staly pasivní zátěží snižující výkon.
+
+**Řešení Managed Agents:** odtrhne reasoning engine od execution layer. Logika agenta zůstává čistá, Anthropic řeší model-specific problémy.
+
+### Brain vs. Hands architektura
+
+Meta-harness princip transformuje infrastrukturu agentů z "pets" (jeden monolitický kontejner co opatrujete) na "cattle" (každá komponenta je resilient a nahraditelná):
+
+- Sandbox crashne z faulty bash příkazu? Harness ho zachytí jako standardní tool-call error, vyzve model k retry s novým kontejnerem. Žádný ztracený kontext.
+- Harness selže? Restartuje okamžitě, stáhne celý event stream z nezávislého session logu, pokračuje z přesného místa selhání.
+- Kontejnery jsou provisioned lazily — reasoning engine začne streamovat okamžitě, sandbox se spustí jen při prvním tool callu vyžadujícím code execution. Výsledek: median time-to-first-token latency klesla o 60%, na 95. percentilu o 90%+.
+
+### Security — Zero-Trust a Credentials Vault
+
+**Reálný attack vector:** malicious prompt skrytý v codebase může instruovat agenta aby četl environment variables a exfiltroval API klíče na externí server.
+
+**Řešení — MCP Proxy architektura:**
+1. Agent vydá strukturovaný tool call proxy, předá jen funkční payload + session-scoped identifikátor. Žádné credentials.
+2. Proxy zkřížuje session identifikátor s Anthropic credentials vault (analogie k HashiCorp Vault).
+3. Proxy stáhne OAuth/bearer tokeny přímo z vault.
+4. Proxy provede API call jménem agenta, vrátí jen operační výstup.
+
+Harness a sandbox zůstávají trvale slepé k podkladovým credentials. Kompromitovaný sandbox nemůže ukrást credentials — jednoduše neexistují v paměti ani filesystému kontejneru.
+
+**Git authentication:** token se použije výhradně při provisioning kontejneru, zapojí se do git remote konfigurace. Agent spouští `git push/pull` nativně bez přístupu k raw tokenu.
+
+### Context Compaction
+
+Long-running agenti čelí degradaci kvality jak se plní context window surovými logy. Managed Agents odděluje kontinuální session od aktivního context window:
+
+- Session = immutable, append-only databáze každého eventu (mimo LLM)
+- Při naplnění kontextu: harness pozastaví execution, injektuje summarizační prompt, model vygeneruje hustý souhrn v XML tagách, surová konverzační historie se smaže, injektuje se jen souhrn
+- Raw eventy přetrvávají v externím session logu — agent může kdykoliv dotazovat historické slices
+
+Ekvivalent v Claude Code: `/compact` (manuální kompakce), `/clear` (reset session).
+
+### Event Stream — real-time telemetrie
+
+Agenti operují asynchronně. Aplikace se připojuje k SSE (Server-Sent Events) streamu. Klíčové typy eventů: zprávy, tool cally, status updates, span termination (z nich lze extrahovat token consumption a počítat náklady v reálném čase).
+
+Session state je persistentní — můžeš přidávat zprávy do stejného session ID hodiny nebo dny po sobě. Agent provisionuje nový kontejner a pokračuje v přesném předchozím kontextu.
+
+### Multi-Agent Swarm (Research Preview)
+
+Pro komplexní workloady: orchestrátorský agent s týmem specialistů (database specialist, frontend reviewer, security auditor). Decompose task → orchestrátor spustí independent concurrent sessions pro každého sub-agenta → každý sub-agent má čistý, focused context window → komunikace přes internal message queue a shared workspace log.
+
+Use case: audit celého repozitáře na authentication vulnerabilities a přepsání postižených endpointů. Paralelizovaný swarm za minuty místo dní.
+
+### Outcomes — Deterministic Self-Evaluation (Research Preview)
+
+Definuješ explicitní, ověřitelná kritéria úspěchu přes JSON schemas a binární assertions:
+- Vygenerovaná funkce musí mít pod 50 řádků
+- Musí být přítomny a projít 3 distinct edge-case testy
+- Output musí striktně odpovídat OpenAPI specifikaci
+
+Pokud assertion selže, agent vstoupí do autoresearch refinement loop. Interní benchmarking: zvýšení success rate o 10 p.b. na komplexních structural generation workflows.
+
+### Enterprise Case Studies
+
+- **Asana AI Teammates**: agenti s deep awareness of Asana work graph. Autonomně přijímají tasky, dekomponují cíle, používají Google Drive/SharePoint via MCP, postují checkpoint komentáře.
+- **Rakuten**: 5 divisí (product, sales, marketing, finance, HR), každý domain-specific agent shipping za méně než týden. 79% redukce time-to-market pro nové AI features.
+- **Sentry**: detection → autonomous remediation → PR. Zero human intervention until code merge.
+
+### Deployment Checklist
+
+1. Account na `platform.claude.com` s kredity
+2. Agent vytvořen (system prompt, model, tools)
+3. Environment nakonfigurován (network rules, dependencies)
+4. Credentials vault setup (OAuth connections)
+5. Test session v konzoli
+6. Agent ID, Environment ID, Vault ID extrahovány
+7. Session management logika v application backendu
+8. SSE event stream handler implementován
+9. Database persistence pro session IDs
+10. Cost monitoring dashboard
+
+### Open-Source alternativy k Managed Agents
+
+- **Eigent + CAMEL-AI** — local-first, privacy-centric, Docker/self-hosted, model-agnostic (Claude + OpenAI + Ollama)
+- **MultiCA** — AI agenti jako členové týmu na vizuálních kanban boardech, real-time WebSocket streaming
+- **Cabinet** — AI-first knowledge base na file-based markdown s git-backed historií, persistent memory, scheduled cron jobs
+- **n8n** — visual node automation s encrypted credential vaults (ne striktně agent harness, ale robustní pro enterprise orchestraci)
+
+---
+
+## Claude Skills — Praktický průvodce (Modul 1: Základy)
+
+*Zdroj rozšíření: @Ai_here202 na X, 15. 4. 2026 — https://x.com/Ai_here202/status/2044357700012883980*
+
+### Skills vs Projects vs MCP — kde co patří
+
+| | Co dělá | Klíčové vlastnosti |
+|---|---|---|
+| **Projects** | Knowledge base | Statické, informační, reference-only |
+| **Skills** | Execution engine | Procedurální, opakovatelné, automatizované |
+| **MCP** | Connection layer | Napojení na databáze, kalendáře, emaily |
+
+**Kdy vytvořit skill:** pokud jsi napsal stejné instrukce více než 3×, nebo chceš konzistentní, opakovatelný output.
+
+### 5-krokový průvodce výstavbou skillu
+
+**Krok 1 — Define the Job**
+Tři klíčové otázky:
+1. Co skill dělá? (velmi specificky — ne "pomáhá s daty", ale "transformuje messy CSV soubory do strukturovaných spreadsheetů s clean headers, standardizovanými daty YYYY-MM-DD a bez prázdných řádků")
+2. Kdy se aktivuje? (konkrétní user inputs jako triggery)
+3. Jak vypadá úspěch? (before vs after příklad)
+
+Většina skillů selhává právě zde — definice je příliš vágní.
+
+**Krok 2 — YAML triggery**
+Tři pravidla:
+- Third-person jazyk: ❌ "I help users..." ✅ "Processes input data..."
+- Buď explicitní s triggery — Claude nepředpokládá záměr
+- Nastav negative boundaries (kdy se skill NEMÁ aktivovat)
+
+**Krok 3 — Instrukce**
+Jeden konkrétní příklad > desítky abstraktních instrukcí. Vždy zahrni: input + expected output.
+
+**Krok 4 — Reference handling**
+Soubory ukládej do `references/` složky. **Kritické pravidlo:** jen jedna úroveň hloubky — reference files nesmí odkazovat na jiné reference files (Claude může truncate context).
+
+**Krok 5 — Deploy**
+Umísti složku do `~/.claude/skills/`. Claude ji automaticky detekuje.
+
+**Shortcut — automatizace tvorby skillu:**
+1. Nový chat → požádej o build skillu pro tvůj task
+2. Nahraj příklady, šablony, guidelines
+3. Odpověz na strukturované otázky
+4. Systém vygeneruje kompletní SKILL.md, správnou strukturu, ready-to-deploy setup
+
+---
+
+## Claude x TradingView — MCP integrace pro tradery
+
+*Zdroj: @milesdeutscher na X, 15. 4. 2026 — https://x.com/milesdeutscher/status/2044536031991763414*
+
+TradingView nemá veřejné API. MCP server od @Tradesdontlie (github.com/tradesdontlie/tradingview-mcp) toto obchází a dává Claude přístup k live datům z TradingView Desktop.
+
+**Jak to funguje:**
+Claude nečte jen screenshot grafu. Čte skutečné underlying hodnoty — stejně jako developer console čte živou webovou stránku.
+
+**Požadavky:** Claude Code, Node.js 18+, TradingView Desktop app, placený TradingView plán (real-time data)
+
+**Setup (2 kroky):**
+1. V Claude Code spusť: *"Install the TradingView MCP server. Clone and explore https://github.com/tradesdontlie/tradingview-mcp, run npm install, add to my MCP config at ~/.claude/.mcp.json, and launch TradingView with the debug port."* → klikej Allow
+2. Health check: *"Use tv_health_check to confirm TradingView is connected."*
+
+**Reálné use cases:**
+- **Live price data:** "Go to my TradingView charts and overlay the live price of $BTC versus $SOL — which one is outperforming today?"
+- **Market research report:** "I haven't been at my desk all day. Take a screenshot of the SP500. Give me a detailed research report."
+- **Add indicators:** "Source the best indicators for volume, 100D moving average, and a volatility index, and put them on my charts."
+- **Technical analysis + drawing:** "Conduct TA on Bitcoin. Draw what you're seeing on my charts."
+- **Price alerts:** "Set price alerts for $BTC breaking above $75,000, for SP500 breaking ATH, and go through my watchlist for dip-buying opportunities."
+- **Pine Script development, backtesting via Replay mode, tab management, timeframe changes**
+
+**Praktické limitace:**
+- Manuální "babysitting" (klikání Allow) je zdlouhavé — lepší na druhém monitoru na pozadí
+- Složitější prompty mohou trvat 10+ minut
+- Spotřebovává Claude tokeny — používej na high-leverage tasky (strategie, Pine Scripts), ne jednoduché akce
+
+**Tip:** Kombinuj s Claude Scheduled Tasks nebo Remote Control pro autonomní ranní scan watchlistu.
+
+---
+
+## GitHub repos pro Claude Code — 12 nejlepších
+
+*Zdroj: @InduTripat82427 na X, 16. 4. 2026 — https://x.com/InduTripat82427/status/2044796125811740893*
+
+| # | Repo | Co dělá |
+|---|---|---|
+| 1 | **claude-mem** (github.com/thedotmack/claude-mem) | Persistent memory across sessions — stop re-teaching Claude codebase |
+| 2 | **UI UX Pro Max** | 50+ stylů, 161 color palettes, 99 UX guidelines — Claude přestane budovat ugly UI |
+| 3 | **n8n-MCP** (github.com/czlonkowski/n8n-mcp) | Napojení Claude Code na 400+ n8n integrací přes MCP |
+| 4 | **LightRAG** (github.com/HKUDS/LightRAG) | Graph + vector RAG — Claude chápe velké codebases strukturálně |
+| 5 | **Everything Claude Code** (github.com/affaan-m/everything-claude-code) | Skills, instincts, security scanning, multi-language coverage — full agent harness |
+| 6 | **Antigravity Awesome Skills** (github.com/sickn33/antigravity-awesome-skills) | Community bible — curated skills, hooks, slash commands, orchestrators |
+| 7 | **Superpowers** (github.com/obra/superpowers) | Vynucuje strukturované myšlení před psaním kódu |
+| 8 | **Claude Code Ultimate Guide** (github.com/FlorianBruniaux/claude-code-ultimate-guide) | 23K+ řádků dokumentace, 219 šablon, 271 kvízů — začátečník → power user |
+| 9 | **Antigravity Awesome Skills** | 1 200+ ready-to-use skills — jedna z největších kolekcí |
+| 10 | **Claude Agent Blueprints** (github.com/danielrosehill/Claude-Agent-Blueprints) | 75+ agent workspace šablon mimo coding |
+| 11 | **VoiceMode MCP** (github.com/mbailey/voicemode) | Hlasové konverzace s Claude Code přes Whisper + Kokoro |
+| 12 | **Awesome Claude Plugins** (github.com/ComposioHQ/awesome-claude-plugins) | 9 000+ repozitářů s adoption metrics — najdeš co lidi skutečně instalují |
+
+---
+
+## AI Speed-to-Lead Agent — postav a prodej za $2K+
+
+*Zdroj: @coreyganim na X, 4. 4. 2026 — https://x.com/coreyganim/status/2040394205537714324*
+
+**Co to je:** AI systém který reaguje na příchozí leady okamžitě, 24/7, bez lidského zapojení. Formulář vyplněn → agent odpoví za sekundy, klade kvalifikační otázky, zachytí detaily, bookne schůzku, pošle majiteli souhrn.
+
+**Proč to funguje:**
+- 78% zákazníků koupí od toho kdo odpoví první
+- 5minutová odpověď = 21× větší pravděpodobnost kvalifikace vs. 30 minut
+- Průměrná B2B response time: 42 hodin → lead je pryč
+
+Klíč: inteligentní odpověď, ne jen potvrzení. "Hey [Name], thanks for asking about [specific service]. Is this residential or commercial?" = konverzace, ne autoresponder.
+
+**Tři způsoby výstavby:**
+
+| Nástroj | Čas | Cena/měs | Vhodné pro |
+|---|---|---|---|
+| **Zapier** | 1–2 hod | $50–150 | Dead-simple workflows |
+| **Make** | 2–4 hod | $9–16 | Nejlepší poměr výkon/jednoduchost |
+| **n8n** | 4–8 hod | Self-hosted = zdarma | Maximální výkon |
+
+**Doporučený stack:** Make.com + Twilio SMS ($0.0079/zpráva) + OpenAI API + Calendly + klientův CRM. Celkem $20–50/měs.
+
+**Cenotvorba:**
+- Setup: $1 500–5 000 (single SMS responder → multi-channel AI agent)
+- Monthly retainer: $300–1 000
+- Jak justifikovat: roofing firma zavře 2 extra joby po $5K = $10K nový revenue. Tvůj $500/měs retainer = 20× návratnost. Klient si spočítá sám.
+
+**Jak najít prvního klienta:**
+1. Vyber jeden niche (contractors jsou nejsnazší)
+2. Najdi 10 firem s kontaktními formuláři
+3. Odešli inquiry, sleduj response time
+4. Email těm nejpomalejším: "I submitted an inquiry 3 days ago. Never heard back. How many leads like me do you lose each month? I can fix that."
+5. První klient zdarma za testimonial → case study → dalších 10 klientů
+
+---
+
+## $12K/měsíc — AI Implementation Consulting Service
+
+*Zdroj: @Zephyr_hg na X, 18. 4. 2026 — https://x.com/Zephyr_hg/status/2045575416010686889*
+
+**Co to je:** Pracuješ s 10–50 person businessem. Auditujete jak firma skutečně funguje → identifikujete 3–5 workflows které krvácejí hodiny týdně → navrhnete a postavíte AI/automation systémy → trénujete tým → zůstanete na retaineru pro tuning a next batch.
+
+**Proč AI nemůže nahradit:** AI sice staví workflows, ale nevybírá které. Výběr vyžaduje pochopení businessu — rozhovor s ops ledem, sledování jak sales tým operuje mezi 5 nástroji, identifikace bottlenecku. To je lidská práce. Zodpovědnost. Lidský hlas v telefonu když workflow padne v 21:00 před launchem.
+
+**Co $12K/měsíc skutečně kupuje:**
+- Měsíc 1: Operační audit → prioritized list automation příležitostí + projected hours saved/týden
+- Měsíc 2: Build 3 systémy, integrace do existujících nástrojů
+- Měsíc 3: Training týmu, dokumentace, monitoring setup
+- Měsíc 4+: Tuning, next wave, opravy
+
+**Matematika:** 20-person tým ztrácí 15 hod/týden na manuální práci = 60 hod/měsíc × $75/hod = $4 500 ztracený čas. $12 000 za službu co šetří $18 000–25 000 na práci = triviální math pro každého majitele.
+
+**Tři nabídky (pick one per client):**
+1. **Audit only** — $3 000 flat, 1 týden. 30-stránkový prioritized playbook. 20% se změní v full engagement. (Trojanský kůň)
+2. **Build only** — $15 000 fixed, 3–5 systémů za 6 týdnů
+3. **Full engagement** — $12 000/měsíc, 6-měsíční minimum
+
+**Jak najít první 3 klienty:**
+- Start s vlastní sítí — nabídni audit za $1 500 místo $3 000 za case study
+- Case study → LinkedIn post s konkrétními čísly + 10-min video before/after
+- Post weekly, DM každého 20–50-person business ownera který interaguje
+- Lead otázkou: "Where are you losing time?" — 3 konverzace → discovery call → 1 audit
+
+**Proč August 2026 je deadline:**
+Každý měsíc přichází nová vlna businessů která zjistí že jejich AI purchases nic nevyřešily. Poptávka stoupá. Konkurence je stále nízká — do Q4 2026 to nebude platit.
+
+---
+
+## Claude tokeny — 10 způsobů jak přestat narážet na limity
+
+*Zdroj: @0xWast3 na X, 21. 4. 2026 — https://x.com/0xWast3/status/2046603104678818303*
+
+Claude nepočítá zprávy. Počítá tokeny. Zpráva č. 30 stojí 31× více než zpráva č. 1 — stejný chat, stejný Claude, jen delší historie.
+
+**10 návyků pro efektivní využití:**
+
+1. **Edituj prompt místo follow-upu** — klikni Edit na původní zprávu → oprav → regeneruj. Stará výměna se nahradí, ne přidá. Ušetří až 21× méně tokenů vs. follow-up.
+
+2. **Nový chat každých 15–20 zpráv** — 98.5% tokenů se spotřebuje na čtení staré historie, jen 1.5% na skutečný výstup. Shrnutí staré konverzace + nový chat = efektivita.
+
+3. **Dávkuj otázky do jedné zprávy** — 3 oddělené prompty = 3 context loads. 1 prompt se 3 tasky = 1 context load. Claude navíc vidí celý kontext najednou → lepší výstupy.
+
+4. **Projects pro opakující se soubory** — upload jednou → cached. Každá nová konverzace v projektu na ni odkazuje. Smlouvy, briefingy, style guides → obrovská úspora.
+
+5. **Memory & User Preferences** — Settings → ulož roli, styl, preference jednou. Claude je aplikuje automaticky. Ušetří 3–5 setup zpráv na nový chat.
+
+6. **Vypni features co nepoužíváš** — Web search, connectors, Advanced Thinking přidávají tokeny k KAŽDÉ odpovědi. Pravidlo: pokud jsi to záměrně nezapnul, vypni to.
+
+7. **Haiku pro jednoduché tasky** — gramatika, brainstorming, formátování, překlady. Ušetří 50–70% budgetu pro práci která skutečně potřebuje silnější model.
+
+8. **Rozlož práci přes den** — Claude používá rolling 5-hour window, ne půlnoční reset. Zprávy z 9:00 přestávají počítat ve 14:00. Rozděl do 2–3 session: ráno, odpoledne, večer.
+
+9. **Pracuj mimo peak hours** (od 26. 3. 2026) — stejný query, stejný chat, ale v peak hodinách spaluje limity rychleji. Peak (vyhnout se pro těžké tasky): **5:00–11:00 AM PT / 8:00 AM–2:00 PM ET ve všední dny**. V Evropě = odpoledne.
+
+10. **Extra Usage jako safety net** — Pro/Max subscribers: Settings → Usage → Overage. Když dojde session limit, Claude nepřestane — přepne na pay-as-you-go při API sazbách.
+
+---
+
+## Prompt Engineering — expert úroveň
+
+*Zdroj: @eng_khairallah1 na X, 22. 4. 2026 — https://x.com/eng_khairallah1/status/2046881340977782970*
+
+Model není bottleneck. Prompt je.
+
+**Proč špatné prompty existují:** LLM předpovídají nejpravděpodobnější next token. Vágní prompt → model vyplní mezery nejstatisticky průměrným obsahem.
+
+"Write a blog post about AI" = průměr milionu blogpostů. Specifický prompt s tonálem, strukturou, délkou a cílovou skupinou = unikátní výstup.
+
+**Princip: specifičnost porazí obecnost.** Každý detail odstraní stupeň volnosti kde by model jinak defaultoval na průměr.
+
+### 6 elementů každého expert promptu
+
+1. **Role** — ne "helpful assistant", ale "Senior product strategist s 15 lety B2B SaaS zkušeností"
+2. **Context** — co Claude potřebuje vědět o tvé situaci (industry, audience, constraints, goals)
+3. **Task** — co přesně má udělat (ne "help with marketing", ale "write competitive analysis comparing our positioning against 3 specific competitors")
+4. **Format** — jak má output vypadat ("tabulka + 2-paragraph recommendation")
+5. **Constraints** — co nemá dělat ("no marketing jargon, no generic advice")
+6. **Quality standard** — co znamená "dost dobré" ("analysis specific enough pro product team decision do 5 minut")
+
+Expert prompt zasahuje všech 6. Beginner typicky 1–2.
+
+### Strukturální techniky
+
+**XML tagy pro jasnost** — Claude byl trénován na strukturovaných inputech:
+```xml
+<context>B2B SaaS, 50 zaměstnanců, project management pro construction</context>
+<task>Napiš cold outreach email na VP of Operations</task>
+<constraints>pod 150 slov, žádný generic opener, specifický pain point, low-commitment CTA</constraints>
+<output_format>Subject line, pak email body. Nic jiného.</output_format>
+```
+
+**Context First, Question Last** — dlouhé dokumenty vždy PŘED otázkou. Model zpracuje dokument, vybuduje porozumění, pak narazí na otázku s plným kontextem. Opačné pořadí = retroaktivní reinterpretace = horší výsledky.
+
+**Few-shot příklady** — 1 konkrétní příklad > 10 paragrafů popisu. Zahrn normální případy I edge cases. 3–5 příkladů dá lepší výstup než jakákoliv descriptivní instrukce.
+
+### Pokročilé techniky
+
+**Chain metoda** — nikdy nežádej Claude o 5 věcí v jednom promptu. Rozeřaď do sekvence. Každý prompt fokusovaný → každý výstup hluboký. Kvalita se na každém kroku násobí. Navíc: v každém bodě můžeš zkontrolovat a opravit.
+
+**Self-correction loop** — každá první odpověď je draft. Přidej: "Reread your response. Rate it 1–10 on accuracy, specificity, actionability. Fix anything below 8." Zlepšení v 85–90% případů. Trvá 15 sekund.
+
+**Motivated Constraint** — řekni PROČ constraint existuje:
+- ❌ "Keep it under 200 words."
+- ✅ "Keep it under 200 words — this goes into a Telegram post where anything longer gets cut off."
+
+Když Claude chápe důvod, aplikuje constraint inteligentněji a zachytí edge cases.
+
+**Multi-Perspective Analysis** — pro strategická rozhodnutí:
+```
+Analyze this pricing decision from three perspectives:
+1. Growth-focused CEO (maximize market capture)
+2. CFO watching margins
+3. Customer who wants fair value
+Each perspective: 3 sentences. Then synthesize + flag which perspective you weighted most and why.
+```
+
+**Meta-Prompt** — když nevíš jak napsat dobrý prompt, nech Claude ho napsat:
+```
+I want to accomplish: [cíl]
+Context: [background]
+Good output looks like: [příklad]
+Write me the most effective prompt for this result.
+```
+Vygenerovaný prompt je téměř vždy lepší než co bys napsal sám.
+
+### System-Level mastery
+
+**Context Files** — persistentní markdown soubory pro každý typ práce:
+- `writing-rules.md` — hlas, audience, standardy
+- `analysis-framework.md` — jak hodnotíš data, klíčové metriky
+- `project-context.md` — aktuální projekty, rozhodnutí
+
+Na začátku session: "Read [file] fully before starting. Follow every rule. If about to break a rule, stop and tell me."
+
+**Template Library** — každý skvělý prompt ulož jako šablonu. Stripp specifika, nahraď proměnnými. Měsíce budování = library šablon pro každý typ tasku. Nikdy nezačínáš od nuly.
+
+**Weekly Feedback Loop** — každý pátek: review AI výstupy z týdne. Co minulo cíl? Jaká prompt změna by to opravila? Jaké pravidlo přidat do context files?
+
+---
+
+## Services-as-Software — byznys model budoucnosti
+
+*Zdroj: @itsalexvacca (Alex Vacca, ColdIQ) na X, 15. 4. 2026 — https://x.com/itsalexvacca/status/2044502868556992937*
+
+**Teze (Sequoia partner Julien Bek):** Příští trillion-dollar firma bude prodávat práci, ne nástroj. Na každý dolar software spend existuje 6+ dolarů services spend. AI právě proměnil services budget na něco co startup může napadnout.
+
+**Copilot vs. Autopilot:**
+- **Copilot** — AI v rukou profesionála. Profesionál nese výsledek a vlastní vztah s klientem. (Harvey pro law firms, Rogo pro investment banks)
+- **Autopilot** — přeskočí profesionála, prodává výsledek přímo zákazníkovi. (Crosby pošle NDA, WithCoverage uzavře pojistku, ColdIQ bookne meeting)
+
+Firma prodávající nástroj = permanentní závod s modelem. Firma prodávající práci: zlepšuje se pokaždé, když se zlepší model, protože klesají náklady na delivery při stejné ceně pro zákazníka. Marže roste. Data moat se prohlubuje.
+
+**6-krokový playbook (ověřeno na ColdIQ, $7M ARR):**
+
+1. **Vyber jeden outsourcovaný line item v jednom oboru** — čím užší, tím rychleji sbíráš proprietární data (= moat). Tři ověřující otázky: Je práce již dnes outsourcována (existující budget line)? Je to spíš intelligence work (pattern recognition), ne pure strategy? Je services spend výrazně větší než software spend?
+
+2. **Prvních klientů získej sám** — nepotřebuješ web, deck ani funnel. Potřebuješ klienty kteří ti řeknou co nenáviděli na předchozím vendorovi. Cenu nastav na floor kde chceš být za 3 roky. Zaznamenej a přepiš každý sales call — námitky z prvních 10 callů = copy na sales page po prvních 10 klientech.
+
+3. **Dělej práci ručně co nejdéle** — data z manuálního provozu jsou cennější než jakýkoliv MVP. ColdIQ manuálně vedl první kampaně — tento training set poháněl 2 200+ kampaní pro stovky klientů v dalších letech. 4 artefakty od prvního dne: markdown soubor pro každý opakující se task, Loom pro work s cursorem, decision log per client, soubor neúspěšných kampaní s důvody.
+
+4. **Cenotvorba jako service, reporting jako produkt** — prodávej outcome, buildi dashboardy jako SaaS firma. Fungující cenotvorba: upfront setup fee + měsíční retainer vázaný na outcome metric + performance bonus. Retention v services businessu začíná vypadat jako SaaS retention pokud klientská zkušenost vypadá jako SaaS.
+
+5. **Nejdřív nahraď sebe v delivery** — pořadí náboru: 1. delivery operator (čistá exekuce), 2. technical automator (markdown workflows → agenti), 3. head of delivery. **Nepřijímej marketéra, salespersona ani COO dokud delivery layer neběží bez tebe.**
+
+6. **Compound data moat před compound software** — ulož každý třetí-stránní vstup (raw i cleaned), každý deliverable tagovaný s outcome, reasoning týmu při judgment calls. 3 roky provozu = data asset co pure-SaaS competitor nemůže koupit ani replikovat.
+
+---
+
+## Google Maps AI Lead Gen — $5K–15K/měsíc
+
+*Zdroj: @noisyb0y1 na X, 26. 4. 2026 — https://x.com/noisyb0y1/status/2048396579065799151*
+
+**Insight:** 5 milionů local service businessů na Google Maps (HVAC, plumbing, elektrikáři, pest control, roofing) má problémy které vyřešíš za hodinu — zastaralý web, špatné recenze, žádná online přítomnost. Kombinace AI + Google Maps dává přístup k nevyčerpanému trhu.
+
+### Tři revenue streamy
+
+**1. Website business: $500–2 000 na klienta**
+- Google Maps search "HVAC near me" → hledej firmy bez webu nebo s outdated webem
+- Vezmi název firmy, services z Google Maps profilu, nejlepší customer reviews
+- ChatGPT/Claude vygeneruje kompletní website brief za 2 minuty → AI website builder
+- 4 klienti × $800 = $3 200 + monthly maintenance $100–300/klient
+
+**2. Reputation management: $300–800/měsíc na klienta**
+- Každá firma na Google Maps s méně než 4.2 hvězdami aktivně ztrácí zákazníky (92% zákazníků čte recenze před nákupem)
+- Monitoruj recenze, odpovídej na každou přes AI, eskaluj negativní na majitele
+- Prompt: "Act as a professional customer service manager. Write a warm, professional response to this [positive/negative] review for [business type]. Acknowledge their experience, [add apology if negative], and invite them back. Keep it under 100 words."
+- Škálovatelné: 1 člověk zvládne 15–20 klientů
+
+**3. Cold outreach na autopilotu: 500 leadů denně**
+1. Scrape Google Maps přes Outscraper nebo PhantomBuster → spreadsheet firem s kontakty
+2. Automatic qualification: dej AI spreadsheet → identifikuj firmy s problémy (nízké hodnocení, starý web, chybějící kontaktní info)
+3. Personalizovaný outreach: pro každou qualified firmu AI napíše cold email s konkrétními daty z jejich profilu
+4. Email landing rate: vypadá jako by ho napsal člověk co se skutečně podíval na jejich business
+
+**Realistika:**
+- Týden 1: 40–70 potenciálních klientů
+- Zavřit 5% = 2–4 klienti
+- $5 000–15 000 za měsíc s kombinací všech tří revenue streamů
+
+---
+
+## Multi-Agent Coding Stack 2026: Kimi K2.6 + Claude
+
+*Zdroj: @eng_khairallah1 na X, 28. 4. 2026 — https://x.com/eng_khairallah1/status/2049055333054857612*
+
+**Teze:** Vývojáři co nejvíce produkují nejsou loajální jednomu nástroji. Provozují více agentů a routují každý task tam kde dá nejlepší output za nejnižší cenu.
+
+### Proč Kimi K2.6 jako alternativa k Claude
+
+| Model | SWE-Bench Verified | Input tokens | Output tokens |
+|---|---|---|---|
+| Claude Opus 4.6 | 80.8% | $5/M | $25/M |
+| **Kimi K2.6** | **80.2%** | **$0.80/M** | **$3.60/M** |
+| GPT-5.2 | 80.0% | — | — |
+
+**Kimi K2.6** od Moonshot AI: open-source (Apache 2.0), plné weights na Hugging Face, self-hostovatelný. Terminal-first coding agent **Kimi Code**. Na OpenRouter programming leaderboardu: #1.
+
+**Setup:**
+```bash
+pip install kimi-code
+kimi
+# /login pro autentizaci
+```
+VS Code extension dostupná z marketplace. Nativní podpora Zed, integrace s Cursor a JetBrains přes ACP.
+
+**2-týdenní test (reálné projekty):**
+
+- **REST API od nuly** (DB models, auth, CRUD, tests): Kimi Code naplánovalo kompletní strukturu nejdříve, pak provádělo file po file, referovalo vlastní dřívější rozhodnutí. Výsledek: fungující API s minimálními tweaky. (K2.6 má thinking mode — architektura PŘED generováním kódu)
+- **Refactor přes 12 souborů**: zůstalo koherentní celou cestu. Snížilo průměrný počet kroků o ~35% vs. předchozí stack.
+- **Test suites pro existující codebase**: solid, konzistentní output za zlomek ceny.
+
+**Výsledek:** 85–90% denní coding tasků → Kimi Code (cena 7× nižší). Zbylých 10–15% (komplexní architektura, dlouhé agentic loopty) → Claude.
+
+**MCP kompatibilita — migrace bez tření:**
+```bash
+kimi mcp add-all ~/.claude/mcp.json  # přenes celou konfiguraci
+kimi mcp add <server>               # přidej individuálně
+kimi mcp list                       # přehled
+kimi mcp test <server>              # test connection
+```
+Celý tool ecosystem se přesune okamžitě.
+
+**Klíčové CLI příkazy:**
+- `Ctrl-X` — toggle shell mode (terminál bez opuštění agenta)
+- `/sessions` — view a switch sessions
+- `--continue` — pokračuj přesně kde jsi skončil
+- `/compact` — kompakce context window při plnění
+- `kimi --yolo` — auto-approve všechny modifikace souborů (jen na vlastních projektech!)
+- `kimi acp` — IDE integrace pro Zed/JetBrains
+
+**Agent Swarm — bez ekvivalentu v Claude/GPT:**
+Koordinuje až 100 sub-agentů pracujících paralelně. Real příklady:
+- 40 akademických PDF → 100 000-slov literature review s fully cited datasetem
+- 100 job descriptions → 100 individuálně přizpůsobených CV
+- Jedna astrophysics paper → 40-stránkový report + 20 000-row dataset + 14 publication-grade chartů
+
+**Kde Claude stále vede:**
+- Nejkomplexnější English instruction following (perfektní adherence k detailním constraints přes stovky agentic steps)
+- Context window: Claude 1M tokenů vs. K2.6 262K tokenů
+- Ecosystem maturity (Západ)
+
+**Aktuální stack autora:** 85% práce → Kimi Code, 15% → Claude, batch processing → Agent Swarm. Týdenní API výdaje klesly o ~85%.
