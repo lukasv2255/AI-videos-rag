@@ -1,7 +1,7 @@
 # AI Videos RAG — projektové instrukce
 
 ## Účel projektu
-RAG knowledge base z YouTube kanálu Nick Saraev + curated articles.
+RAG knowledge base z AI YouTube kanálů (Nick Saraev, Cole Medin, Greg Isenberg) + curated articles.
 Dotazování přes MCP server přímo v Claude Code chatu.
 
 ## articles.md — klíčové pravidlo
@@ -39,7 +39,7 @@ Detail...
 **Pravidlo:** Řádek `*Zdroj:*` musí vždy obsahovat plný URL odkaz na originální článek/tweet.
 
 ### Proč strukturovaně
-Nad articles.md se dotazuji přes MCP (`ask_nick_saraev` + articles citace).
+Nad articles.md se dotazuji přes MCP (`ask_ai_videos` + articles citace).
 Dotazy mohou být konkrétní ("co je competitor intelligence") nebo obecné
 ("ukaž perspektivní AI byznys modely") — sekce musí být dohledatelné podle tématu.
 
@@ -47,7 +47,7 @@ Dotazy mohou být konkrétní ("co je competitor intelligence") nebo obecné
 
 **Trigger:** Zpráva začínající `ask [dotaz]` → zavolej MCP nástroje:
 - `search_articles` pro dotazy o obsahu articles.md
-- `ask_nick_saraev` pouze když je v dotazu explicitně Nick ("co říká Nick", "podle Nicka", "z videí")
+- `ask_ai_videos` pro dotazy o videích ("co říkají o X", "z videí", "podle kanálů")
 - Jinak defaultně: čti přímo `articles.md` bez MCP volání
 
 ## MCP server

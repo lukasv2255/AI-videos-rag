@@ -1,0 +1,293 @@
+"""
+MCP server pro dotazování RAG knowledge base z YouTube transkriptů.
+Používá numpy pro vektorové vyhledávání (bez ChromaDB).
+"""
+
+import json
+import os
+import re
+from pathlib import Path
+
+import anthropic
+import numpy as np
+from mcp.server.fastmcp import FastMCP
+from openai import OpenAI
+
+BASE_DIR     = Path(__file__).parent.parent
+VECTORS_FILE = BASE_DIR / "vectors.npy"
+META_FILE    = BASE_DIR / "metadata.json"
+EMBED_MODEL  = "text-embedding-3-small"
+TOP_K        = 6
+
+mcp           = FastMCP("yt-rag")
+client_oai    = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client_claude = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+# Načti vektory a metadata do paměti při startu
+vectors  = np.load(str(VECTORS_FILE)).astype(np.float32)
+metadata = json.loads(META_FILE.read_text())
+# Normalizuj pro cosine similarity přes dot product
+norms    = np.linalg.norm(vectors, axis=1, keepdims=True)
+vectors_norm = vectors / np.maximum(norms, 1e-9)
+
+# Načti articles.md a rozděl na sekce podle nadpisů (## nebo ###)
+ARTICLES_FILE = BASE_DIR / "articles.md"
+_articles_sections = []
+if ARTICLES_FILE.exists():
+    current_title = ""
+    current_body  = []
+    for line in ARTICLES_FILE.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## ") or line.startswith("### "):
+            if current_title and current_body:
+                body_text = "\n".join(current_body).strip()
+                url_match = re.search(r'https?://\S+', body_text)
+                _articles_sections.append({
+                    "title":      current_title,
+                    "text":       body_text,
+                    "source_url": re.sub(r'[)*.,:\s]+$', '', url_match.group(0)) if url_match else "",
+                })
+            current_title = line.lstrip("#").strip()
+            current_body  = []
+        else:
+            current_body.append(line)
+    if current_title and current_body:
+        body_text = "\n".join(current_body).strip()
+        url_match = re.search(r'https?://\S+', body_text)
+        _articles_sections.append({
+            "title":      current_title,
+            "text":       body_text,
+            "source_url": re.sub(r'[)*.,:\s]+$', '', url_match.group(0)) if url_match else "",
+        })
+
+
+def _search_articles(query: str, k: int = 3) -> list:
+    """Najde nejrelevantnější sekce z articles.md podle keyword překryvu."""
+    if not _articles_sections:
+        return []
+    words = set(query.lower().split())
+    scored = []
+    for sec in _articles_sections:
+        haystack = (sec["title"] + " " + sec["text"]).lower()
+        score = sum(1 for w in words if w in haystack)
+        if score > 0:
+            scored.append((score, sec))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [s for _, s in scored[:k]]
+
+
+def _format_article_hits(hits: list) -> str:
+    """Formátuje výsledky z articles.md do čitelného bloku."""
+    parts = []
+    for sec in hits:
+        preview = sec["text"][:600].strip()
+        if len(sec["text"]) > 600:
+            preview += "..."
+        url_line = f"\n🔗 {sec['source_url']}" if sec.get("source_url") else ""
+        parts.append(f"**{sec['title']}**\n{preview}{url_line}")
+    return "\n\n".join(parts)
+
+
+def _search(query: str, k: int = TOP_K) -> list:
+    vec = client_oai.embeddings.create(model=EMBED_MODEL, input=[query]).data[0].embedding
+    q   = np.array(vec, dtype=np.float32)
+    q  /= max(np.linalg.norm(q), 1e-9)
+
+    scores  = vectors_norm @ q          # cosine similarity pro všechny chunky najednou
+    top_idx = np.argsort(scores)[::-1][:k]
+
+    return [{
+        "text":  metadata[i]["text"],
+        "title": metadata[i]["title"],
+        "url":   metadata[i]["url"],
+        "score": round(float(scores[i]), 3),
+    } for i in top_idx]
+
+
+@mcp.tool()
+def search_nick_saraev(query: str) -> str:
+    """
+    Prohledá transktipty YouTube kanálu Nick Saraev a vrátí nejrelevantnější úryvky.
+    Použij kdykoli uživatel chce vědět co Nick Saraev říká o nějakém tématu,
+    nebo se ptá na obsah jeho videí.
+    """
+    hits = _search(query)
+    if not hits:
+        return "Nic nenalezeno."
+
+    parts = []
+    for i, h in enumerate(hits, 1):
+        parts.append(
+            f"[{i}] {h['title']} (relevance: {h['score']})\n"
+            f"URL: {h['url']}\n"
+            f"{h['text'][:500]}"
+        )
+    return "\n\n---\n\n".join(parts)
+
+
+@mcp.tool()
+def ask_ai_videos(question: str) -> str:
+    """
+    Odpověz na otázku nebo vytvoř shrnutí na základě obsahu AI video kanálů (Nick Saraev, Cole Medin, Greg Isenberg a další).
+    Použij pro: shrnutí témat, vysvětlení konceptů, "co říkají o X", "jak funguje Y",
+    nebo jakoukoliv otázku která vyžaduje syntézu z více videí.
+    Vrátí strukturovanou odpověď s citacemi zdrojů.
+    """
+    hits = _search(question, k=8)
+    if not hits:
+        return "V knowledge base nebylo nic nalezeno k tomuto tématu."
+
+    context_parts = []
+    seen_titles   = set()
+    budget        = 12_000
+
+    for h in hits:
+        chunk = f"[{h['title']}]\n{h['text']}\nZdroj: {h['url']}"
+        if len("\n\n".join(context_parts)) + len(chunk) > budget:
+            break
+        context_parts.append(chunk)
+        seen_titles.add(h['title'])
+
+    context = "\n\n---\n\n".join(context_parts)
+    sources = "\n".join(f"- {t}" for t in seen_titles)
+
+    response = client_claude.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=1500,
+        system=(
+            "Jsi asistent specializovaný na obsah AI video kanálů (Nick Saraev, Cole Medin, Greg Isenberg a další). "
+            "Odpovídej výhradně na základě poskytnutých úryvků z transkriptů. "
+            "Buď konkrétní, strukturovaný a cituj z jakých videí a kanálů čerpáš. "
+            "Pokud téma v úryvcích není pokryto, řekni to přímo. "
+            "Odpovídej v jazyce otázky."
+        ),
+        messages=[{
+            "role": "user",
+            "content": f"Úryvky z transkriptů:\n\n{context}\n\n---\n\nOtázka: {question}"
+        }]
+    )
+
+    answer = response.content[0].text
+
+    article_hits = _search_articles(question)
+
+    video_block = (
+        f"**📹 Videa — AI kanály**\n\n"
+        f"{answer}\n\n"
+        f"**Zdroje ({len(seen_titles)} videí):**\n{sources}"
+    )
+
+    if article_hits:
+        articles_block = _format_article_hits(article_hits)
+        return (
+            f"{video_block}\n\n"
+            f"---\n\n"
+            f"**📄 Články**\n\n"
+            f"{articles_block}"
+        )
+
+    return video_block
+
+
+@mcp.tool()
+def search_articles(query: str, k: int = 5) -> str:
+    """
+    Prohledá kurátorované články v articles.md a vrátí nejrelevantnější sekce.
+    Použij pro otázky o Claude ekosystému, skills, MCP, agentech, byznys příležitostech
+    a dalších tématech z articles.md — bez volání embeddings API.
+    Vrátí sekce s názvem, obsahem a odkazem na zdroj.
+    """
+    hits = _search_articles(query, k=k)
+    if not hits:
+        return "Žádné relevantní sekce nenalezeny."
+    return f"**📄 Články** — {len(hits)} výsledků\n\n{_format_article_hits(hits)}"
+
+
+@mcp.tool()
+def summarize_video(title_query: str) -> str:
+    """
+    Shrne obsah konkrétního videa z kanálu Nick Saraev.
+    Zadej část názvu videa (nemusí být přesná) — nástroj najde nejlepší shodu.
+    Použij když uživatel chce shrnutí jednoho konkrétního videa.
+    """
+    # Najdi video podle názvu (case-insensitive substring match, fallback na nejpodobnější)
+    query_lower = title_query.lower()
+    matched_id  = None
+
+    # 1. Přesná shoda podřetězce
+    for item in metadata:
+        if query_lower in item["title"].lower():
+            matched_id = item["video_id"]
+            break
+
+    # 2. Fallback: sémantické hledání názvu
+    if not matched_id:
+        hits = _search(title_query, k=3)
+        if hits:
+            matched_id = next(
+                (m["video_id"] for m in metadata if m["title"] == hits[0]["title"]),
+                None
+            )
+
+    if not matched_id:
+        return f"Video '{title_query}' nenalezeno. Zkus jiný název nebo část názvu."
+
+    # Načti všechny chunky tohoto videa seřazené podle pořadí
+    chunks = sorted(
+        [m for m in metadata if m["video_id"] == matched_id],
+        key=lambda x: x["chunk_index"]
+    )
+    video_title = chunks[0]["title"]
+    video_url   = chunks[0]["url"]
+    full_text   = " ".join(c["text"] for c in chunks)
+
+    # Ořízni na ~14 000 znaků (přibližně 3500 tokenů kontextu)
+    full_text = full_text[:14_000]
+
+    response = client_claude.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=1500,
+        system=(
+            "Jsi asistent který shrnuje obsah YouTube videí. "
+            "Vytvoř strukturované shrnutí: hlavní téma, klíčové body, praktické rady. "
+            "Odpovídej v jazyce otázky."
+        ),
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Shrň toto video:\n"
+                f"Název: {video_title}\n"
+                f"URL: {video_url}\n\n"
+                f"Transkript:\n{full_text}"
+            )
+        }]
+    )
+
+    return f"**{video_title}**\n{video_url}\n\n{response.content[0].text}"
+
+
+@mcp.tool()
+def list_videos(search: str = "") -> str:
+    """
+    Vypíše seznam videí v knowledge base.
+    Volitelně filtruje podle klíčového slova v názvu.
+    Použij když uživatel chce vědět jaká videa jsou dostupná.
+    """
+    seen = {}
+    for item in metadata:
+        if item["video_id"] not in seen:
+            seen[item["video_id"]] = item["title"]
+
+    titles = sorted(seen.values())
+
+    if search:
+        titles = [t for t in titles if search.lower() in t.lower()]
+
+    if not titles:
+        return f"Žádné video neobsahuje '{search}'."
+
+    lines = [f"{i+1}. {t}" for i, t in enumerate(titles)]
+    return f"Nalezeno {len(titles)} videí:\n\n" + "\n".join(lines)
+
+
+if __name__ == "__main__":
+    mcp.run()
