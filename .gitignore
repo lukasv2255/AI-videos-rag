@@ -2,6 +2,10 @@
 vectors.npy
 ingest_done.json
 ingest.log
+download.log
+watchdog.log
+transcript_progress.json
+.DS_Store
 transcripts/
 docs/
 chroma_db/
